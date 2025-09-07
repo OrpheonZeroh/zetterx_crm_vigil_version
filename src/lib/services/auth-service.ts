@@ -217,11 +217,18 @@ export class AuthService {
     try {
       console.log(`🚀 Creating new user via API:`, { email: userInput.email, role: userInput.role })
       
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        return { user: null, error: 'Sesión expirada. Por favor inicia sesión nuevamente.' }
+      }
+      
       // Call API route to create user (server-side with admin permissions)
       const response = await fetch('/api/admin/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           email: userInput.email,

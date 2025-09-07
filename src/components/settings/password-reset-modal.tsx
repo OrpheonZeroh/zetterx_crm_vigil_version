@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, X } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface PasswordResetModalProps {
   isOpen: boolean
@@ -68,10 +69,18 @@ export function PasswordResetModal({ isOpen, onClose, user, onSuccess }: Passwor
     setIsLoading(true)
 
     try {
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        setMessage({ type: 'error', text: 'Sesión expirada. Por favor inicia sesión nuevamente.' })
+        return
+      }
+
       const response = await fetch('/api/admin/users/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           userId: user.id,
