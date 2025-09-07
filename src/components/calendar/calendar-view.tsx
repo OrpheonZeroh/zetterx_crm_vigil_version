@@ -24,12 +24,13 @@ export function CalendarView({ slots, onSlotClick, onDateClick, loading }: Calen
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState<'month' | 'week'>('month')
 
-  const statusColors = {
+  const statusColors: Record<InstallationSlot['status'], string> = {
     scheduled: 'bg-blue-100 text-blue-800 border-blue-200',
+    confirmed: 'bg-blue-100 text-blue-800 border-blue-200',
     in_progress: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    completed: 'bg-green-100 text-green-800 border-green-200',
-    cancelled: 'bg-red-100 text-red-800 border-red-200',
-    rescheduled: 'bg-purple-100 text-purple-800 border-purple-200'
+    done: 'bg-green-100 text-green-800 border-green-200',
+    no_show: 'bg-orange-100 text-orange-800 border-orange-200',
+    cancelled: 'bg-red-100 text-red-800 border-red-200'
   }
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -112,7 +113,7 @@ export function CalendarView({ slots, onSlotClick, onDateClick, loading }: Calen
 
   const getSlotsForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0]
-    return slots.filter(slot => slot.scheduled_at === dateStr)
+    return slots.filter(slot => slot.start_at.startsWith(dateStr))
   }
 
   const isToday = (date: Date) => {
@@ -248,7 +249,7 @@ export function CalendarView({ slots, onSlotClick, onDateClick, loading }: Calen
                       <div className="flex items-center space-x-1">
                         <Clock className="w-3 h-3" />
                         <span className="font-medium">
-                          {formatTime(slot.start_time)}
+                          {formatTime(slot.start_at)}
                         </span>
                       </div>
                       <div className="flex items-center space-x-1 mt-1">
@@ -257,10 +258,10 @@ export function CalendarView({ slots, onSlotClick, onDateClick, loading }: Calen
                           {slot.work_order?.customer?.name || 'Sin cliente'}
                         </span>
                       </div>
-                      {slot.location && (
+                      {slot.work_order?.address_line && (
                         <div className="flex items-center space-x-1 mt-1">
                           <MapPin className="w-3 h-3" />
-                          <span className="truncate">{slot.location}</span>
+                          <span className="truncate">{slot.work_order.address_line}</span>
                         </div>
                       )}
                     </div>

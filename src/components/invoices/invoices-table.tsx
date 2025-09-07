@@ -57,22 +57,38 @@ export function InvoicesTable({ invoices: propInvoices = [], onRefresh }: Invoic
       const customerEmail = invoice.rec_email || invoice.customer?.email || ''
       
       if (!customerEmail) {
-        showToast('Error: No se encontró email del cliente')
+        showToast({
+          type: 'error',
+          title: 'Error',
+          message: 'No se encontró email del cliente'
+        })
         return
       }
 
       const result = await DGIApiService.processInvoiceWithDGI(invoice.id!, customerEmail)
       
       if (result.success) {
-        showToast(`✅ Factura procesada y enviada a ${customerEmail}`)
+        showToast({
+          type: 'success',
+          title: 'DGI Procesado',
+          message: `Factura procesada y enviada a ${customerEmail}`
+        })
         onRefresh?.() // Refrescar tabla para mostrar datos DGI
       } else {
-        showToast(`❌ Error: ${result.message}`)
+        showToast({
+          type: 'error',
+          title: 'Error DGI',
+          message: result.message
+        })
       }
 
     } catch (error) {
-      console.error('Error procesando DGI:', error)
-      showToast('Error procesando factura con DGI')
+      console.error('Error procesando con DGI:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Error al procesar con DGI'
+      })
     } finally {
       setLoading(false)
     }

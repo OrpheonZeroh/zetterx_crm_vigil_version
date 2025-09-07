@@ -45,11 +45,20 @@ export default function InspectionsPage() {
     }
   }
 
+  const handleSubmit = async (inspection: { id?: string; work_order_id: string; scheduled_date: string; status: string; notes?: string }) => {
+    try {
+      const stats = await InspectionService.getInspectionStats()
+      setStats(stats)
+    } catch (error: unknown) {
+      console.error('Error loading stats:', error)
+    }
+  }
+
   const loadStats = async () => {
     try {
       const stats = await InspectionService.getInspectionStats()
       setStats(stats)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading stats:', error)
     }
   }

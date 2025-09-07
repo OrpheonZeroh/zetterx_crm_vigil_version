@@ -1,6 +1,5 @@
 'use client'
 
-import { DOMParser } from 'xmldom'
 
 export interface DGIInvoiceData {
   cufe: string

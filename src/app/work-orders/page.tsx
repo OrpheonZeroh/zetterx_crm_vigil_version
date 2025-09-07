@@ -8,7 +8,7 @@ import { WorkOrderModal } from '@/components/work-orders/work-order-modal'
 import { FilterModal } from '@/components/work-orders/filter-modal'
 import { ExportModal } from '@/components/work-orders/export-modal'
 import { Button } from '@/components/ui/button'
-import { Plus, FileText, DollarSign, TrendingUp, Filter, Download } from 'lucide-react'
+import { Calendar, MapPin, Plus, Search, User, Filter, Download, FileText, DollarSign } from 'lucide-react'
 import { StatsCard } from '@/components/common'
 import { WorkOrderService, type WorkOrder } from '@/lib/services/work-order-service'
 import { useToast } from '@/components/ui/toast'
@@ -64,11 +64,20 @@ export default function WorkOrdersPage() {
     }
   }
 
+  const handleSubmit = async (workOrder: { id?: string; customer_id: string; title: string; status: string; estimated_value?: number }) => {
+    try {
+      const stats = await WorkOrderService.getWorkOrderStats()
+      setStats(stats)
+    } catch (error: unknown) {
+      console.error('Error loading stats:', error)
+    }
+  }
+
   const loadStats = async () => {
     try {
       const stats = await WorkOrderService.getWorkOrderStats()
       setStats(stats)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading stats:', error)
     }
   }

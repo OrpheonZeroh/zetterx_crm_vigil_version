@@ -15,7 +15,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -29,7 +29,29 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - required for Server Components
   // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-refresh-tokens
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Define protected routes
+  const protectedRoutes = ['/dashboard', '/customers', '/orders', '/calendar', '/reports', '/settings']
+  const publicRoutes = ['/login', '/register', '/']
+  
+  const { pathname } = request.nextUrl
+
+  // Check if the current path is a protected route
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
+  const isPublicRoute = publicRoutes.includes(pathname)
+
+  // If user is not authenticated and trying to access protected route
+  if (!user && isProtectedRoute) {
+    const loginUrl = new URL('/login', request.url)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // If user is authenticated and trying to access login/register, redirect to dashboard
+  if (user && (pathname === '/login' || pathname === '/register')) {
+    const dashboardUrl = new URL('/dashboard', request.url)
+    return NextResponse.redirect(dashboardUrl)
+  }
 
   return supabaseResponse
 }

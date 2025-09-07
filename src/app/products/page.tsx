@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/toast'
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     services: 0,

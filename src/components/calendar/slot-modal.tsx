@@ -23,13 +23,11 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
   
   const [formData, setFormData] = useState({
     work_order_id: slot?.work_order_id || '',
-    technician_id: slot?.technician_id || '',
-    scheduled_at: slot?.scheduled_at || selectedDate || new Date().toISOString().split('T')[0],
-    start_time: slot?.start_time || '09:00',
-    end_time: slot?.end_time || '10:00',
+    team_id: slot?.team_id || '',
+    start_at: slot?.start_at || `${selectedDate || new Date().toISOString().split('T')[0]}T09:00:00`,
+    end_at: slot?.end_at || `${selectedDate || new Date().toISOString().split('T')[0]}T10:00:00`,
     status: slot?.status || 'scheduled' as InstallationSlot['status'],
-    location: slot?.location || '',
-    estimated_duration: slot?.estimated_duration || 60,
+    cost_estimate: slot?.cost_estimate || 0,
     notes: slot?.notes || ''
   })
 
@@ -43,30 +41,26 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
     if (slot) {
       setFormData({
         work_order_id: slot.work_order_id || '',
-        technician_id: slot.technician_id || '',
-        scheduled_at: slot.scheduled_at || selectedDate || new Date().toISOString().split('T')[0],
-        start_time: slot.start_time || '09:00',
-        end_time: slot.end_time || '10:00',
+        team_id: slot.team_id || '',
+        start_at: slot.start_at || `${selectedDate || new Date().toISOString().split('T')[0]}T09:00:00`,
+        end_at: slot.end_at || `${selectedDate || new Date().toISOString().split('T')[0]}T10:00:00`,
         status: slot.status || 'scheduled',
-        location: slot.location || '',
-        estimated_duration: slot.estimated_duration || 60,
+        cost_estimate: slot.cost_estimate || 0,
         notes: slot.notes || ''
       })
     } else {
       setFormData({
         work_order_id: '',
-        technician_id: '',
-        scheduled_at: selectedDate || new Date().toISOString().split('T')[0],
-        start_time: '09:00',
-        end_time: '10:00',
+        team_id: '',
+        start_at: `${selectedDate || new Date().toISOString().split('T')[0]}T09:00:00`,
+        end_at: `${selectedDate || new Date().toISOString().split('T')[0]}T10:00:00`,
         status: 'scheduled',
-        location: '',
-        estimated_duration: 60,
+        cost_estimate: 0,
         notes: ''
       })
     }
     setError('')
-  }, [slot, isOpen, selectedDate])
+  }, [slot, selectedDate])
 
   const loadWorkOrders = async () => {
     try {
@@ -96,22 +90,30 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
   }
 
   const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const startTime = e.target.value
-    const endTime = calculateEndTime(startTime, formData.estimated_duration)
+    const timeValue = e.target.value
+    const dateStr = formData.start_at.split('T')[0]
+    const startDateTime = `${dateStr}T${timeValue}:00`
+    
+    // Calculate end time (default 1 hour duration)
+    const startTime = new Date(startDateTime)
+    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000) // Add 1 hour
+    const endDateTime = endTime.toISOString().slice(0, 19)
+    
     setFormData(prev => ({ 
       ...prev, 
-      start_time: startTime,
-      end_time: endTime
+      start_at: startDateTime,
+      end_at: endDateTime
     }))
   }
 
-  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const duration = parseInt(e.target.value) || 60
-    const endTime = calculateEndTime(formData.start_time, duration)
+  const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const timeValue = e.target.value
+    const dateStr = formData.end_at.split('T')[0]
+    const endDateTime = `${dateStr}T${timeValue}:00`
+    
     setFormData(prev => ({ 
       ...prev, 
-      estimated_duration: duration,
-      end_time: endTime
+      end_at: endDateTime
     }))
   }
 
@@ -121,42 +123,54 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
     setError('')
 
     try {
-      if (!formData.work_order_id || !formData.scheduled_at || !formData.start_time) {
-        setError('Por favor completa todos los campos requeridos')
-        return
+      if (!formData.work_order_id) {
+        throw new Error('Debe seleccionar una orden de trabajo')
       }
 
+      // Validate times
+      const startDateTime = new Date(formData.start_at)
+      const endDateTime = new Date(formData.end_at)
+      
+      if (endDateTime <= startDateTime) {
+        throw new Error('La hora de fin debe ser posterior a la hora de inicio')
+      }
+
+      // Calculate duration in minutes
+      const durationMinutes = (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60)
+      
+      if (durationMinutes < 15) {
+        throw new Error('La duración mínima es de 15 minutos')
+      }
+
+      // Create slot data
       const slotData = {
-        ...formData,
-        estimated_duration: parseInt(formData.estimated_duration.toString()) || 60
+        id: slot?.id,
+        work_order_id: formData.work_order_id,
+        team_id: formData.team_id,
+        start_at: formData.start_at,
+        end_at: formData.end_at,
+        status: formData.status,
+        cost_estimate: formData.cost_estimate,
+        notes: formData.notes
       }
 
       if (slot?.id) {
         await CalendarService.updateSlot(slot.id, slotData)
-        showToast({
-          type: 'success',
-          title: 'Cita actualizada',
-          message: `Cita del ${new Date(formData.scheduled_at).toLocaleDateString('es-PA')} ha sido actualizada`
-        })
       } else {
         await CalendarService.createSlot(slotData)
-        showToast({
-          type: 'success',
-          title: 'Cita creada',
-          message: `Cita programada para el ${new Date(formData.scheduled_at).toLocaleDateString('es-PA')}`
-        })
       }
-      
-      onSave()
+
+      onSave?.()
       onClose()
-    } catch (err: any) {
-      console.error('Error saving slot:', err)
-      setError(err.message || 'Error al guardar la cita')
+
       showToast({
-        type: 'error',
-        title: 'Error',
-        message: err.message || 'Error al guardar la cita'
+        type: 'success',
+        title: slot ? 'Cita actualizada' : 'Cita creada',
+        message: slot ? 'La cita se actualizó correctamente' : 'La nueva cita se creó correctamente'
       })
+    } catch (error: unknown) {
+      console.error('Error saving slot:', error)
+      setError(error instanceof Error ? error.message : 'Error al guardar la cita')
     } finally {
       setLoading(false)
     }
@@ -226,9 +240,18 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
                   </label>
                   <input
                     type="date"
-                    name="scheduled_at"
-                    value={formData.scheduled_at}
-                    onChange={handleChange}
+                    name="start_at"
+                    value={formData.start_at.split('T')[0]}
+                    onChange={(e) => {
+                      const newDate = e.target.value
+                      const startTime = formData.start_at.split('T')[1] || '09:00:00'
+                      const endTime = formData.end_at.split('T')[1] || '10:00:00'
+                      setFormData(prev => ({
+                        ...prev,
+                        start_at: `${newDate}T${startTime}`,
+                        end_at: `${newDate}T${endTime}`
+                      }))
+                    }}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -252,17 +275,19 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
                 </div>
               </div>
 
-              {/* Location */}
+              {/* Cost Estimate */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ubicación
+                  Estimado de Costo
                 </label>
                 <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
+                  type="number"
+                  name="cost_estimate"
+                  value={formData.cost_estimate}
                   onChange={handleChange}
-                  placeholder="Dirección o ubicación específica"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -280,8 +305,7 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
                   </label>
                   <input
                     type="time"
-                    name="start_time"
-                    value={formData.start_time}
+                    value={formData.start_at.split('T')[1]?.slice(0, 5) || '09:00'}
                     onChange={handleStartTimeChange}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -293,46 +317,26 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
                   </label>
                   <input
                     type="time"
-                    name="end_time"
-                    value={formData.end_time}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                    readOnly
+                    value={formData.end_at.split('T')[1]?.slice(0, 5) || '10:00'}
+                    onChange={handleEndTimeChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
 
-              {/* Duration */}
+              {/* Team Assignment */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Duración Estimada (minutos)
+                  Equipo Asignado
                 </label>
                 <input
-                  type="number"
-                  name="estimated_duration"
-                  value={formData.estimated_duration}
-                  onChange={handleDurationChange}
-                  min="15"
-                  max="480"
-                  step="15"
+                  type="text"
+                  name="team_id"
+                  value={formData.team_id}
+                  onChange={handleChange}
+                  placeholder="ID del equipo"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-              </div>
-
-              {/* Technician */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Técnico Asignado
-                </label>
-                <select
-                  name="technician_id"
-                  value={formData.technician_id}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Sin asignar</option>
-                  {/* Would need to load technicians/users */}
-                </select>
               </div>
 
               {/* Notes */}

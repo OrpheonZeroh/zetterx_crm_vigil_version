@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Settings, Users, Building, Shield, Globe, Target } from 'lucide-react'
 import { UserManagement } from '@/components/settings/user-management'
 import { SalesTargets } from '@/components/settings/sales-targets'
+import { PasswordManagement } from '@/components/settings/password-management'
 import { cn } from '@/lib/utils'
 
 type SettingsTab = 'users' | 'organization' | 'sales-targets' | 'security' | 'integrations'
@@ -37,13 +38,7 @@ export default function SettingsPage() {
       case 'sales-targets':
         return <SalesTargets />
       case 'security':
-        return (
-          <div className="bg-white p-12 rounded-lg border border-gray-200 text-center">
-            <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Configuración de Seguridad</h3>
-            <p className="text-gray-600">Próximamente disponible</p>
-          </div>
-        )
+        return <PasswordManagement />
       case 'integrations':
         return (
           <div className="bg-white p-12 rounded-lg border border-gray-200 text-center">

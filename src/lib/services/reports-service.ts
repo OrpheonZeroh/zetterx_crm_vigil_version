@@ -80,7 +80,7 @@ export class ReportsService {
 
     if (error) throw new Error(`Error fetching sales metrics: ${error.message}`)
 
-    const totalRevenue = invoices?.reduce((sum, inv) => sum + (inv.work_order?.estimated_value || 0), 0) || 0
+    const totalRevenue = invoices?.reduce((sum, inv) => sum + (inv.work_order?.[0]?.estimated_value || 0), 0) || 0
     const totalInvoices = invoices?.length || 0
     const avgInvoiceValue = totalInvoices > 0 ? totalRevenue / totalInvoices : 0
 
@@ -90,7 +90,7 @@ export class ReportsService {
       if (!acc[month]) {
         acc[month] = { revenue: 0, invoices: 0 }
       }
-      acc[month].revenue += inv.work_order?.estimated_value || 0
+      acc[month].revenue += inv.work_order?.[0]?.estimated_value || 0
       acc[month].invoices += 1
       return acc
     }, {} as Record<string, { revenue: number; invoices: number }>) || {}
@@ -236,7 +236,7 @@ export class ReportsService {
     // Team performance
     const teamPerformance = installations?.reduce((acc, installation) => {
       if (installation.team) {
-        const teamName = installation.team.name
+        const teamName = installation.team?.[0]?.name || 'Sin equipo'
         if (!acc[teamName]) {
           acc[teamName] = { completed: 0, total: 0 }
         }

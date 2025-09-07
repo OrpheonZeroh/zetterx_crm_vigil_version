@@ -33,14 +33,14 @@ export function UserModal({ isOpen, onClose, user, onSave }: UserModalProps) {
         password: '', // Never pre-fill password
         full_name: user.full_name,
         role: user.role,
-        phone: user.phone || ''
+        phone: ''
       })
     } else {
       setFormData({
         email: '',
         password: '',
         full_name: '',
-        role: 'instalador',
+        role: 'tech',
         phone: ''
       })
     }
@@ -72,8 +72,7 @@ export function UserModal({ isOpen, onClose, user, onSave }: UserModalProps) {
         // Update existing user
         const result = await AuthService.updateUserProfile(user.id, {
           full_name: formData.full_name,
-          role: formData.role,
-          phone: formData.phone || undefined
+          role: formData.role
         })
 
         if (!result.success) {
@@ -119,8 +118,8 @@ export function UserModal({ isOpen, onClose, user, onSave }: UserModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in slide-in-from-bottom-4 duration-300 border border-slate-200/60 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b">
           <h3 className="text-lg font-medium text-gray-900">
             {user ? 'Editar Usuario' : 'Nuevo Usuario'}
@@ -232,14 +231,18 @@ export function UserModal({ isOpen, onClose, user, onSave }: UserModalProps) {
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="instalador">Instalador</option>
-                <option value="administrativo">Administrativo</option>
                 <option value="admin">Administrador</option>
+                <option value="ops">Operaciones</option>
+                <option value="tech">Técnico</option>
+                <option value="sales">Ventas</option>
+                <option value="viewer">Visualización</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 {formData.role === 'admin' && 'Acceso completo al sistema'}
-                {formData.role === 'administrativo' && 'Acceso a clientes, órdenes, inspecciones, facturas y calendario'}
-                {formData.role === 'instalador' && 'Acceso a órdenes de trabajo, inspecciones y calendario'}
+                {formData.role === 'ops' && 'Acceso a operaciones'}
+                {formData.role === 'tech' && 'Acceso a técnicos'}
+                {formData.role === 'sales' && 'Acceso a ventas'}
+                {formData.role === 'viewer' && 'Acceso a visualización'}
               </p>
             </div>
           </div>

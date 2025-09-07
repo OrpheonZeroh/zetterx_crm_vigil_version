@@ -6,7 +6,7 @@ import { RouteGuard } from '@/components/layout/route-guard'
 import { InvoicesTable } from '@/components/invoices/invoices-table'
 import { InvoiceModal } from '@/components/invoices/invoice-modal'
 import { Button } from '@/components/ui/button'
-import { Plus, FileText, DollarSign, TrendingUp, Filter, Download } from 'lucide-react'
+import { Calendar, Download, Eye, Plus, Search, Filter, FileText, DollarSign } from 'lucide-react'
 import { StatsCard } from '@/components/common'
 import { InvoiceService, type Invoice } from '@/lib/services/invoice-service'
 import { useToast } from '@/components/ui/toast'
@@ -46,11 +46,20 @@ export default function InvoicesPage() {
     }
   }
 
+  const handleSubmit = async (invoice: { id?: string; customer_id: string; amount: number; status: string; due_date: string }) => {
+    try {
+      const stats = await InvoiceService.getInvoiceStats()
+      setStats(stats)
+    } catch (error: unknown) {
+      console.error('Error loading stats:', error)
+    }
+  }
+
   const loadStats = async () => {
     try {
       const stats = await InvoiceService.getInvoiceStats()
       setStats(stats)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading stats:', error)
     }
   }

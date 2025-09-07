@@ -234,6 +234,7 @@ export const TestHelpers = {
 
 // Exportar para uso en consola del navegador
 if (typeof window !== 'undefined') {
-  (window as any).InvoiceEmailTester = InvoiceEmailTester
-  (window as any).TestHelpers = TestHelpers
+  const windowGlobal = window as unknown as Record<string, unknown>
+  windowGlobal.InvoiceEmailTester = InvoiceEmailTester
+  windowGlobal.TestHelpers = TestHelpers
 }

@@ -36,9 +36,9 @@ export default function LoginPage() {
         console.log('Usuario logueado:', data.user)
         router.push('/dashboard')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error en handleSubmit:', error)
-      setError(error.message || 'Error al iniciar sesión')
+      setError(error instanceof Error ? error.message : 'Error al iniciar sesión')
     } finally {
       setLoading(false)
     }
@@ -162,15 +162,6 @@ export default function LoginPage() {
 
 
                 <div className="text-center">
-                  <p className="text-sm text-slate-600">
-                    ¿No tienes cuenta?{' '}
-                    <button 
-                      onClick={() => router.push('/register')}
-                      className="text-blue-600 hover:text-blue-700 font-semibold transition-colors"
-                    >
-                      Regístrate aquí
-                    </button>
-                  </p>
                 </div>
               </div>
             </div>

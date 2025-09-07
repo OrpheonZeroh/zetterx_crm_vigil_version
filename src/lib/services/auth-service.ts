@@ -1,8 +1,9 @@
 'use client'
 
 import { supabase } from '@/lib/supabase'
-import type { User } from '@supabase/supabase-js'
+import { createClient, User } from '@supabase/supabase-js'
 
+// Define types locally
 export type UserRole = 'admin' | 'ops' | 'sales' | 'tech' | 'viewer'
 
 export interface UserProfile {
@@ -14,13 +15,15 @@ export interface UserProfile {
   created_at: string
 }
 
+// Note: Admin operations are handled via API routes for security
+
 export interface Permission {
   module: string
   actions: string[]
 }
 
-// Define permissions for each role
-export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+// Define permissions for each role (keeping local copy to avoid import issues)
+const LOCAL_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: [
     { module: 'customers', actions: ['read', 'create', 'update', 'delete'] },
     { module: 'work-orders', actions: ['read', 'create', 'update', 'delete'] },
@@ -164,13 +167,25 @@ export class AuthService {
 
   // Check if user has permission for a specific module and action
   static async hasPermission(module: string, action: string): Promise<boolean> {
+    console.log(`🔍 Checking permission for module: ${module}, action: ${action}`)
     const profile = await this.getCurrentProfile()
-    if (!profile || !profile.is_active) return false
-
-    const rolePermissions = ROLE_PERMISSIONS[profile.role]
-    const modulePermission = rolePermissions.find(p => p.module === module)
+    console.log(`👤 Current profile:`, profile)
     
-    return modulePermission ? modulePermission.actions.includes(action) : false
+    if (!profile || !profile.is_active) {
+      console.log(`❌ No profile or inactive user`)
+      return false
+    }
+
+    const rolePermissions = LOCAL_ROLE_PERMISSIONS[profile.role]
+    console.log(`🔑 Role permissions for ${profile.role}:`, rolePermissions)
+    
+    const modulePermission = rolePermissions.find(p => p.module === module)
+    console.log(`📋 Module permission for ${module}:`, modulePermission)
+    
+    const hasAccess = modulePermission ? modulePermission.actions.includes(action) : false
+    console.log(`✅ Has access: ${hasAccess}`)
+    
+    return hasAccess
   }
 
   // Check if user can access a module
@@ -178,7 +193,7 @@ export class AuthService {
     const profile = await this.getCurrentProfile()
     if (!profile || !profile.is_active) return false
 
-    const rolePermissions = ROLE_PERMISSIONS[profile.role]
+    const rolePermissions = LOCAL_ROLE_PERMISSIONS[profile.role]
     return rolePermissions.some(p => p.module === module)
   }
 
@@ -187,11 +202,11 @@ export class AuthService {
     const profile = await this.getCurrentProfile()
     if (!profile || !profile.is_active) return []
 
-    const rolePermissions = ROLE_PERMISSIONS[profile.role]
+    const rolePermissions = LOCAL_ROLE_PERMISSIONS[profile.role]
     return rolePermissions.map(p => p.module)
   }
 
-  // Create new user (Admin only)
+  // Create new user (Admin only) - Uses API route for security
   static async createUser(userInput: {
     email: string
     password: string
@@ -200,65 +215,42 @@ export class AuthService {
     phone?: string
   }): Promise<{ user: UserProfile | null; error: string | null }> {
     try {
-      // Check if current user is admin
-      const canCreate = await this.hasPermission('users', 'create')
-      if (!canCreate) {
-        return { user: null, error: 'No tienes permisos para crear usuarios' }
-      }
-
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: userInput.email,
-        password: userInput.password,
-        email_confirm: true
-      })
-
-      if (authError) {
-        return { user: null, error: authError.message }
-      }
-
-      if (!authData.user) {
-        return { user: null, error: 'Error al crear usuario' }
-      }
-
-      // Create user record
-      const { data: userRecord, error: userError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
+      console.log(`🚀 Creating new user via API:`, { email: userInput.email, role: userInput.role })
+      
+      // Call API route to create user (server-side with admin permissions)
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: userInput.email,
+          password: userInput.password,
           full_name: userInput.full_name,
           role: userInput.role,
-          is_active: true
+          phone: userInput.phone
         })
-        .select()
-        .single()
+      })
 
-      if (userError) {
-        // Try to delete the auth user if user record creation fails
-        await supabase.auth.admin.deleteUser(authData.user.id)
-        return { user: null, error: userError.message }
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('API Error:', data.error)
+        return { user: null, error: data.error || 'Error al crear usuario' }
       }
 
-      return {
-        user: {
-          id: userRecord.id,
-          email: userInput.email,
-          full_name: userRecord.full_name,
-          role: userRecord.role as UserRole,
-          is_active: userRecord.is_active,
-          created_at: userRecord.created_at
-        },
-        error: null
-      }
+      console.log(`✅ User created successfully:`, data.user)
+      return { user: data.user, error: null }
+
     } catch (error: any) {
-      return { user: null, error: error.message || 'Error al crear usuario' }
+      console.error('Network error:', error)
+      return { user: null, error: 'Error de conexión' }
     }
   }
 
   // Get all users (Admin only)
   static async getUsers(): Promise<UserProfile[]> {
-    const canRead = await this.hasPermission('users', 'read')
+    const canRead = await this.hasPermission('settings', 'read')
     if (!canRead) return []
 
     const { data, error } = await supabase
@@ -287,7 +279,7 @@ export class AuthService {
     updates: Partial<Omit<UserProfile, 'id' | 'email' | 'created_at'>>
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const canUpdate = await this.hasPermission('users', 'update')
+      const canUpdate = await this.hasPermission('settings', 'update')
       if (!canUpdate) {
         return { success: false, error: 'No tienes permisos para actualizar usuarios' }
       }
@@ -310,7 +302,7 @@ export class AuthService {
   // Toggle user active status
   static async toggleUserStatus(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const canUpdate = await this.hasPermission('users', 'update')
+      const canUpdate = await this.hasPermission('settings', 'update')
       if (!canUpdate) {
         return { success: false, error: 'No tienes permisos para actualizar usuarios' }
       }

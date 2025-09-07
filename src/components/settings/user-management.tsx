@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, Edit, Trash2, Users, UserCheck, UserX } from 'lucide-react'
+import { Plus, Edit, Trash2, Users, UserCheck, UserX, Lock } from 'lucide-react'
 import { AuthService, type UserProfile, type UserRole } from '@/lib/services/auth-service'
 import { useToast } from '@/components/ui/toast'
 import { StatusBadge, LoadingSpinner } from '@/components/common'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 import { UserModal } from './user-modal'
+import { PasswordResetModal } from './password-reset-modal'
 
 interface UserManagementProps {
   onRefresh?: () => void
@@ -26,6 +27,11 @@ export function UserManagement({ onRefresh }: UserManagementProps) {
     user: UserProfile | null
     loading: boolean
   }>({ isOpen: false, user: null, loading: false })
+
+  const [passwordResetModal, setPasswordResetModal] = useState<{
+    isOpen: boolean
+    user: UserProfile | null
+  }>({ isOpen: false, user: null })
 
   const { showToast } = useToast()
 
@@ -72,6 +78,18 @@ export function UserManagement({ onRefresh }: UserManagementProps) {
     setToggleModal({ isOpen: true, user, loading: false })
   }
 
+  const handleResetPassword = (user: UserProfile) => {
+    setPasswordResetModal({ isOpen: true, user })
+  }
+
+  const handlePasswordResetSuccess = () => {
+    showToast({
+      type: 'success',
+      title: 'Contraseña restablecida',
+      message: 'La contraseña ha sido restablecida exitosamente'
+    })
+  }
+
   const confirmToggleStatus = async () => {
     if (!toggleModal.user) return
     
@@ -102,14 +120,18 @@ export function UserManagement({ onRefresh }: UserManagementProps) {
     }
   }
 
-  const getRoleBadgeColor = (role: UserRole) => {
+  const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin':
         return 'bg-red-100 text-red-800'
-      case 'administrativo':
+      case 'ops':
         return 'bg-blue-100 text-blue-800'
-      case 'instalador':
+      case 'tech':
         return 'bg-green-100 text-green-800'
+      case 'sales':
+        return 'bg-purple-100 text-purple-800'
+      case 'viewer':
+        return 'bg-gray-100 text-gray-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -119,10 +141,14 @@ export function UserManagement({ onRefresh }: UserManagementProps) {
     switch (role) {
       case 'admin':
         return 'Administrador'
-      case 'administrativo':
-        return 'Administrativo'
-      case 'instalador':
-        return 'Instalador'
+      case 'ops':
+        return 'Operaciones'
+      case 'tech':
+        return 'Técnico'
+      case 'sales':
+        return 'Ventas'
+      case 'viewer':
+        return 'Visualización'
       default:
         return role
     }
@@ -186,15 +212,10 @@ export function UserManagement({ onRefresh }: UserManagementProps) {
                       <div className="text-sm text-gray-500">
                         {user.email}
                       </div>
-                      {user.phone && (
-                        <div className="text-sm text-gray-500">
-                          {user.phone}
-                        </div>
-                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
                       {getRoleLabel(user.role)}
                     </span>
                   </td>
@@ -219,14 +240,25 @@ export function UserManagement({ onRefresh }: UserManagementProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditUser(user)}
+                        title="Editar usuario"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleResetPassword(user)}
+                        className="text-orange-600 hover:text-orange-700"
+                        title="Restablecer contraseña"
+                      >
+                        <Lock className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleToggleStatus(user)}
                         className={user.is_active ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+                        title={user.is_active ? 'Desactivar usuario' : 'Activar usuario'}
                       >
                         {user.is_active ? (
                           <UserX className="h-4 w-4" />
@@ -277,6 +309,16 @@ export function UserManagement({ onRefresh }: UserManagementProps) {
         type={toggleModal.user?.is_active ? 'danger' : 'info'}
         loading={toggleModal.loading}
       />
+
+      {/* Password Reset Modal */}
+      {passwordResetModal.user && (
+        <PasswordResetModal
+          isOpen={passwordResetModal.isOpen}
+          onClose={() => setPasswordResetModal({ isOpen: false, user: null })}
+          user={passwordResetModal.user}
+          onSuccess={handlePasswordResetSuccess}
+        />
+      )}
     </div>
   )
 }

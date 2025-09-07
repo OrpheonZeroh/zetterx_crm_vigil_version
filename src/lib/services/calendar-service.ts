@@ -15,6 +15,7 @@ export interface InstallationSlot {
   work_order?: {
     id: string
     title: string
+    address_line?: string
     customer: {
       name: string
       phone?: string

@@ -61,7 +61,7 @@ export default function CalendarPage() {
     try {
       const stats = await CalendarService.getCalendarStats()
       setStats(stats)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading stats:', error)
     }
   }
