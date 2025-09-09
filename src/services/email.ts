@@ -1,7 +1,18 @@
 import { Resend } from 'resend';
 import { EmailStatus } from '@/types/dgi';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+// Initialize Resend only if API key is available
+let resend: Resend | null = null;
+
+try {
+  if (process.env.RESEND_API_KEY) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  } else {
+    console.warn('⚠️ RESEND_API_KEY not found - email functionality will be disabled');
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Resend:', error);
+}
 
 export class EmailService {
   /**
@@ -19,6 +30,14 @@ export class EmailService {
     cc?: string[]
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      if (!resend) {
+        console.warn('📧 Resend not initialized - email functionality disabled');
+        return {
+          success: false,
+          error: 'Email service not available - RESEND_API_KEY not configured'
+        };
+      }
+
       const attachments: Array<{ filename: string; content: Buffer }> = [];
       
       if (pdfBuffer) {
@@ -251,6 +270,11 @@ export class EmailService {
     context?: any
   ): Promise<void> {
     try {
+      if (!resend) {
+        console.warn('📧 Cannot send error notification - Resend not initialized');
+        return;
+      }
+
       const supportEmail = process.env.SUPPORT_EMAIL || 'support@zetterx.com';
       
       await resend.emails.send({
