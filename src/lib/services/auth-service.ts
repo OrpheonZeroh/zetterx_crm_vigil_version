@@ -76,17 +76,21 @@ export class AuthService {
   static async getCurrentProfile(): Promise<UserProfile | null> {
     try {
       console.log('🔍 Getting current user profile...')
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
       
-      if (authError) {
-        console.error('❌ Auth error:', authError)
+      // Try to get session first
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error('❌ Session error:', sessionError)
         return null
       }
       
-      if (!user) {
-        console.log('⚠️ No authenticated user found')
+      if (!session?.user) {
+        console.log('⚠️ No authenticated session found')
         return null
       }
+      
+      const user = session.user
 
       console.log('✅ User authenticated:', { id: user.id, email: user.email })
 

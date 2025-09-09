@@ -85,10 +85,35 @@ export class InvoiceEmailTester {
     try {
       const processed = DGIProcessorService.processDGIResponse(MOCK_DGI_RESPONSE)!
       
+      // Transformar datos para ser compatibles con PDFGeneratorService
+      const pdfData = {
+        numeroFactura: processed.numeroFactura,
+        cufe: processed.cufe,
+        urlCufe: processed.urlConsulta || '',
+        emisor: processed.emisor,
+        cliente: processed.cliente,
+        items: processed.items,
+        metodosPayment: processed.formaPago ? [processed.formaPago] : [],
+        fechaEmision: processed.fechaEmision,
+        subtotal: processed.totales?.subtotal || 0,
+        itbms: processed.totales?.itbmsTotal || 0,
+        total: processed.totales?.total || 0,
+        estado: processed.estado?.codigo || 'AUTHORIZED',
+        protocoloAutorizacion: processed.protocoloAutorizacion,
+        totales: {
+          subtotal: processed.totales?.subtotal || 0,
+          itbms: processed.totales?.itbmsTotal || 0,
+          total: processed.totales?.total || 0
+        },
+        formaPago: processed.formaPago ? [processed.formaPago] : [],
+        urlQR: processed.urlQR,
+        urlConsulta: processed.urlConsulta
+      }
+      
       // Solo importamos dinámicamente para evitar errores en build
       const { PDFGeneratorService } = await import('@/lib/services/pdf-generator-service')
       
-      const pdfBase64 = await PDFGeneratorService.generatePDFBase64(processed)
+      const pdfBase64 = await PDFGeneratorService.generatePDFBase64(pdfData)
       
       console.log('✅ PDF generado (placeholder):', pdfBase64.length, 'caracteres')
       

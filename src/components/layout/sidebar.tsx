@@ -17,7 +17,9 @@ import {
   Home,
   BarChart3,
   CreditCard,
-  ClipboardList
+  ClipboardList,
+  Calculator,
+  Bot
 } from 'lucide-react'
 
 const navigation = [
@@ -25,10 +27,12 @@ const navigation = [
   { name: 'Clientes', href: '/customers', icon: Users },
   { name: 'Productos', href: '/products', icon: Building2 },
   { name: 'Órdenes', href: '/work-orders', icon: FileText },
+  { name: 'Cotizaciones', href: '/quotes', icon: Calculator },
   { name: 'Inspecciones', href: '/inspections', icon: ClipboardList },
   { name: 'Agenda', href: '/calendar', icon: Calendar },
   { name: 'Facturación', href: '/invoices', icon: CreditCard },
   { name: 'Reportes', href: '/reports', icon: BarChart3 },
+  { name: 'IA', href: '/ai', icon: Bot },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 

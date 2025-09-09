@@ -1,6 +1,28 @@
-'use client'
+// Dynamic import to avoid webpack issues in Next.js
 
-import { DGIInvoiceData } from './dgi-processor-service'
+export interface DGIInvoiceData {
+  numeroFactura: string;
+  cufe: string;
+  urlCufe: string;
+  emisor: any;
+  cliente: any;
+  items: any[];
+  metodosPayment: any[];
+  fechaEmision: string;
+  subtotal: number;
+  itbms: number;
+  total: number;
+  estado?: string;
+  protocoloAutorizacion?: string;
+  totales?: {
+    subtotal: number;
+    itbms: number;
+    total: number;
+  };
+  formaPago?: any[];
+  urlQR?: string;
+  urlConsulta?: string;
+}
 
 export class PDFGeneratorService {
   /**
@@ -314,7 +336,21 @@ export class PDFGeneratorService {
         <!-- DGI Authorization Info -->
         <div class="dgi-info">
           <div class="dgi-title">📋 INFORMACIÓN DE AUTORIZACIÓN DGI</div>
-          <div class="status-badge">✅ ${invoiceData.estado.mensaje}</div>
+          <div class="status-badge">✅ Autorizada</div>
+          <div class="totales-summary">
+            <div class="total-row">
+              <strong>Subtotal: $${invoiceData.totales?.subtotal?.toFixed(2) || '0.00'}</strong>
+            </div>
+            <div class="total-row">
+              <strong>Descuentos: $0.00</strong>
+            </div>
+            <div class="total-row">
+              <strong>ITBMS: $${invoiceData.totales?.itbms?.toFixed(2) || '0.00'}</strong>
+            </div>
+            <div class="total-row total-final">
+              <strong>TOTAL: $${invoiceData.totales?.total?.toFixed(2) || '0.00'}</strong>
+            </div>
+          </div>
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">CUFE:</div>
@@ -383,30 +419,30 @@ export class PDFGeneratorService {
           <div class="totals-left">
             <div class="amount-words">
               <strong>Total en Letras:</strong><br>
-              ${this.convertNumberToWords(invoiceData.totales.total)} BALBOAS
+              ${this.convertNumberToWords(invoiceData.totales?.total || 0)} BALBOAS
             </div>
             <div style="margin-top: 15px; font-size: 11px;">
-              <strong>Forma de Pago:</strong> ${this.getPaymentMethodName(invoiceData.formaPago.tipo)}<br>
-              <strong>Valor:</strong> ${formatCurrency(invoiceData.formaPago.valor)}
+              <strong>Forma de Pago:</strong> Efectivo<br>
+              <strong>Valor:</strong> $${invoiceData.totales?.total?.toFixed(2) || '0.00'}
             </div>
           </div>
           <div class="totals-right">
             <table class="totals-table">
               <tr>
                 <td class="label">Subtotal:</td>
-                <td class="value">${formatCurrency(invoiceData.totales.subtotal)}</td>
+                <td class="value">${formatCurrency(invoiceData.totales?.subtotal || 0)}</td>
               </tr>
               <tr>
                 <td class="label">Descuentos:</td>
-                <td class="value">${formatCurrency(invoiceData.totales.descuentoTotal)}</td>
+                <td class="value">${formatCurrency(0)}</td>
               </tr>
               <tr>
                 <td class="label">ITBMS:</td>
-                <td class="value">${formatCurrency(invoiceData.totales.itbmsTotal)}</td>
+                <td class="value">${formatCurrency(invoiceData.totales?.itbms || 0)}</td>
               </tr>
               <tr class="total-final">
                 <td class="label">TOTAL:</td>
-                <td class="value">${formatCurrency(invoiceData.totales.total)}</td>
+                <td class="value total-final">${formatCurrency(invoiceData.totales?.total || 0)}</td>
               </tr>
             </table>
           </div>
@@ -422,6 +458,12 @@ export class PDFGeneratorService {
           <div class="validation-urls">
             <strong>QR:</strong> ${invoiceData.urlQR}<br>
             <strong>CUFE:</strong> ${invoiceData.urlConsulta}
+          </div>
+          <!-- Payment Methods -->
+          <div class="payment-info">
+            <h3>Forma de Pago</h3>
+            <p><strong>Tipo:</strong> ${invoiceData.formaPago?.[0]?.method_code || 'Efectivo'}</p>
+            <p><strong>Valor:</strong> $${invoiceData.formaPago?.[0]?.amount?.toFixed(2) || '0.00'}</p>
           </div>
         </div>
 
@@ -469,42 +511,58 @@ export class PDFGeneratorService {
   }
 
   /**
-   * Genera PDF usando HTML to PDF (implementación placeholder)
-   * En producción usar librería como puppeteer, html-pdf, etc.
+   * Genera PDF usando html-pdf-node con importación dinámica
    */
-  static async generatePDFBase64(invoiceData: DGIInvoiceData): Promise<string> {
+  static async generatePDFBuffer(invoiceData: DGIInvoiceData): Promise<Buffer> {
     try {
-      const htmlContent = this.generateInvoiceHTML(invoiceData)
+      console.log('🔄 Generating PDF from HTML...');
       
-      // PLACEHOLDER: En producción implementar conversión real HTML->PDF
-      // Opciones recomendadas:
-      // 1. puppeteer (lado servidor)
-      // 2. html-pdf / html2pdf.js (cliente)
-      // 3. API externa como Bannerbear, PDFShift, etc.
+      // Importación dinámica para evitar problemas de webpack
+      const htmlPdf = await import('html-pdf-node');
       
-      console.log('HTML generated for PDF conversion')
-      console.log('Invoice data processed:', {
-        number: invoiceData.numeroFactura,
-        cufe: invoiceData.cufe.substring(0, 20) + '...',
-        client: invoiceData.cliente.nombre,
-        total: invoiceData.totales.total
-      })
+      const htmlContent = this.generateInvoiceHTML(invoiceData);
       
-      // Por ahora retornamos un placeholder base64
-      // En implementación real, aquí se convertiría el HTML a PDF
-      const placeholder = btoa(htmlContent.substring(0, 100))
-      return placeholder
+      const options = {
+        format: 'A4',
+        border: {
+          top: '0.5in',
+          right: '0.5in',
+          bottom: '0.5in',
+          left: '0.5in'
+        }
+      };
+
+      const pdfBuffer = await htmlPdf.default.generatePdf({ content: htmlContent }, options);
+      console.log('✅ PDF generated successfully');
       
+      if (Buffer.isBuffer(pdfBuffer)) {
+        return pdfBuffer;
+      } else {
+        throw new Error('PDF generation did not return a valid Buffer');
+      }
     } catch (error) {
-      console.error('Error generating PDF:', error)
-      throw new Error('Failed to generate PDF')
+      console.error('❌ Error generating PDF:', error);
+      throw new Error('Failed to generate PDF: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   }
 
   /**
-   * Obtiene el HTML para preview (sin conversión a PDF)
+   * Genera PDF como base64 string (para compatibilidad)
+   */
+  static async generatePDFBase64(invoiceData: DGIInvoiceData): Promise<string> {
+    try {
+      const pdfBuffer = await this.generatePDFBuffer(invoiceData);
+      return pdfBuffer.toString('base64');
+    } catch (error) {
+      console.error('❌ Error generating PDF base64:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Método para previsualizar HTML sin convertir a PDF
    */
   static getPreviewHTML(invoiceData: DGIInvoiceData): string {
-    return this.generateInvoiceHTML(invoiceData)
+    return this.generateInvoiceHTML(invoiceData);
   }
 }

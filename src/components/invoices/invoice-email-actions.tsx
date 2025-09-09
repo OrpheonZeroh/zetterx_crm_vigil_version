@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { InvoiceEmailService } from '@/lib/services/invoice-email-service'
+// Removed import of InvoiceEmailService to avoid client-side PDF generation issues
 import { Mail, Send, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react'
 
 interface InvoiceEmailActionsProps {
@@ -28,34 +28,64 @@ export function InvoiceEmailActions({
   const [showEmailInput, setShowEmailInput] = useState(false)
 
   const handleSendEmail = async () => {
-    if (!emailAddress.trim()) {
-      setStatus('error')
-      setMessage('Debe ingresar un email válido')
-      return
-    }
+    if (!emailAddress.trim()) return
+    
+    setLoading(true)
+    setStatus('idle')
+    setMessage('')
 
     try {
-      setLoading(true)
-      setStatus('idle')
+      // Use API route instead of direct service call
+      const response = await fetch(`/api/dgi/invoices/${invoiceId}/resend-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailAddress })
+      })
 
-      const result = await InvoiceEmailService.resendInvoiceEmail(
-        invoiceId, 
-        emailAddress.trim()
-      )
+      const result = await response.json()
 
       if (result.success) {
         setStatus('success')
-        setMessage('✅ Factura enviada exitosamente')
+        setMessage('Email enviado exitosamente')
         setShowEmailInput(false)
       } else {
         setStatus('error')
-        setMessage(`❌ ${result.message}`)
+        setMessage(result.error || 'Error al enviar email')
       }
-
     } catch (error) {
       setStatus('error')
-      setMessage('❌ Error inesperado al enviar email')
-      console.error('Error sending email:', error)
+      setMessage('Error al enviar email')
+      console.error('Email send error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendEmail = async () => {
+    setLoading(true)
+    setStatus('idle')
+    setMessage('')
+
+    try {
+      // Use API route instead of direct service call
+      const response = await fetch(`/api/dgi/invoices/${invoiceId}/resend-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setStatus('success')
+        setMessage('Email reenviado exitosamente')
+      } else {
+        setStatus('error')
+        setMessage(result.error || 'Error al reenviar email')
+      }
+    } catch (error) {
+      setStatus('error')
+      setMessage('Error al reenviar email')
+      console.error('Email resend error:', error)
     } finally {
       setLoading(false)
     }
@@ -64,10 +94,14 @@ export function InvoiceEmailActions({
   const handleCheckStatus = async () => {
     try {
       setLoading(true)
-      const result = await InvoiceEmailService.getInvoiceEmailStatus(invoiceId)
+      const response = await fetch(`/api/dgi/invoices/${invoiceId}/email-status`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      const data = await response.json()
       
-      if (result.success) {
-        const data = result.data!
+      if (response.ok && data.success) {
         let statusMessage = ''
         
         if (!data.hasCufe) {
@@ -78,11 +112,11 @@ export function InvoiceEmailActions({
           statusMessage = '📋 Autorizada pero no enviada por email'
         }
 
+        setStatus('success')
         setMessage(statusMessage)
-        setStatus(data.emailSent ? 'success' : 'error')
       } else {
-        setMessage(`❌ ${result.message}`)
         setStatus('error')
+        setMessage(data.error || 'Error al verificar estado')
       }
     } catch (error) {
       setMessage('❌ Error consultando estado')

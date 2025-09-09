@@ -29,7 +29,7 @@ function exportToCSV(products: Product[], filename: string = 'productos') {
     product.unit_price?.toString() || '0',
     product.itbms_rate?.toString() || '0',
     product.is_service ? 'Servicio' : 'Producto',
-    product.status ? 'Activo' : 'Inactivo',
+    product.is_active ? 'Activo' : 'Inactivo',
     product.created_at ? new Date(product.created_at).toLocaleDateString('es-PA') : ''
   ])
 
@@ -114,7 +114,7 @@ function exportToPDF(products: Product[], filename: string = 'productos') {
               <td class="price">$${(product.unit_price || 0).toFixed(2)}</td>
               <td>${(product.itbms_rate || 0).toFixed(1)}%</td>
               <td>${product.is_service ? 'Servicio' : 'Producto'}</td>
-              <td>${product.status ? 'Activo' : 'Inactivo'}</td>
+              <td>${product.is_active ? 'Activo' : 'Inactivo'}</td>
             </tr>
           `).join('')}
         </tbody>

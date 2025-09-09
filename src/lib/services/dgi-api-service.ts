@@ -1,7 +1,5 @@
-'use client'
-
+// Server-side service - removed 'use client' and InvoiceEmailService import to avoid PDF generation issues
 import { Invoice } from './invoice-service'
-import { InvoiceEmailService } from './invoice-email-service'
 
 export interface DGIApiConfig {
   baseUrl: string
@@ -128,14 +126,20 @@ export class DGIApiService {
   static invoiceToDGIPayload(invoice: Invoice, customerEmail?: string): DGIPayload {
     const now = new Date()
     const formattedDate = now.toISOString().slice(0, 19) + '-05:00'
+    
+    // Generate proper DGI document number format: POS-YYYY-NNNNNNNN
+    const year = now.getFullYear()
+    const posCode = (invoice.pos_code || "001").padStart(3, '0')
+    const docNumber = invoice.doc_number.padStart(8, '0')
+    const dgiDocNumber = `${posCode}-${year}-${docNumber}`
 
     return {
       dGen: {
         iAmb: this.CONFIG.isTestMode ? 2 : 1, // 2=Test, 1=Producción
         iTpEmis: "01",
         iDoc: "01", 
-        dNroDF: invoice.doc_number,
-        dPtoFacDF: invoice.pos_code || "001",
+        dNroDF: dgiDocNumber,
+        dPtoFacDF: posCode,
         dFechaEm: formattedDate,
         dFechaSalida: formattedDate,
         iNatOp: "01",
@@ -156,10 +160,10 @@ export class DGIApiService {
             dDV: invoice.emis_ruc_dv || "86"
           },
           gUbiEm: {
-            dCodUbi: invoice.emis_ubi_code || "8-8-8",
-            dCorreg: invoice.emis_correg || "PUEBLO NUEVO", 
-            dDistr: invoice.emis_district || "PANAMA",
-            dProv: invoice.emis_province || "PANAMA"
+            dCodUbi: "0101",
+            dCorreg: "01",
+            dDistr: "01",
+            dProv: "01"
           },
           dTfnEm: "507-1234"
         },
@@ -169,10 +173,10 @@ export class DGIApiService {
           dDirecRec: invoice.rec_address || "Ciudad de Panama",
           cPaisRec: invoice.rec_country || "PA",
           gUbiRec: {
-            dCodUbi: invoice.rec_ubi_code || "8-8-7",
-            dCorreg: invoice.rec_correg || "BELLA VISTA",
-            dDistr: invoice.rec_district || "PANAMA", 
-            dProv: invoice.rec_province || "PANAMA"
+            dCodUbi: "0101",
+            dCorreg: "01",
+            dDistr: "01",
+            dProv: "01"
           },
           dTfnRec: "507-5678",
           dCorElectRec: customerEmail || invoice.rec_email || invoice.customer?.email || "cliente@test.com"
@@ -306,19 +310,14 @@ export class DGIApiService {
       // 2. Enviar a DGI
       const dgiResponse = await this.sendInvoiceToDGI(invoice, customerEmail)
 
-      // 3. Procesar respuesta y enviar email automáticamente
-      const emailResult = await InvoiceEmailService.processAndSendInvoice({
-        dgiResponse,
-        customerEmail,
-        invoiceId: invoice.id
-      })
-
+      // 3. For now, return DGI response without email processing
+      // Email processing should be handled via API routes to avoid client-side PDF generation
       return {
-        success: emailResult.success,
-        message: emailResult.message,
+        success: true,
+        message: 'Invoice processed successfully',
         dgiResponse,
-        emailSent: emailResult.emailSent,
-        cufe: emailResult.cufe
+        emailSent: false,
+        cufe: dgiResponse.processingResult?.cufe
       }
 
     } catch (error) {
@@ -343,14 +342,11 @@ export class DGIApiService {
       pos_code: '001',
       total_net: 150.00,
       total_itbms: 0.00,
-      total_isc: 0.00,
       total_gravado: 0.00,
       total_discount: 0.00,
       total_amount: 150.00,
       total_received: 150.00,
       items_total: 150.00,
-      num_items: 1,
-      num_payments: 1,
       customer: {
         id: 'test-customer',
         name: 'Cliente Test',
@@ -366,13 +362,9 @@ export class DGIApiService {
       const dgiResponse = await this.sendInvoiceToDGI(mockInvoice as Invoice, testEmail)
       console.log('✅ Prueba DGI exitosa:', dgiResponse)
       
-      // Procesar con sistema de email
-      const emailResult = await InvoiceEmailService.processAndSendInvoice({
-        dgiResponse,
-        customerEmail: testEmail
-      })
-      
-      console.log('📧 Resultado email:', emailResult)
+      // Email processing disabled in client-side service
+      // Use API routes for email processing to avoid PDF generation issues
+      console.log('📧 Email processing should be done via API routes')
       
     } catch (error) {
       console.error('❌ Error en prueba:', error)

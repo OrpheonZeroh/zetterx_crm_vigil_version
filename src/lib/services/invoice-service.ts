@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase'
 
 export interface Invoice {
   id?: string
-  work_order_id?: string
-  customer_id?: string
+  work_order_id?: string | null
+  customer_id?: string | null
   env_code: number
   emission_type: string
   doc_type: string
@@ -13,14 +13,6 @@ export interface Invoice {
   pos_code?: string
   issue_date: string
   exit_date?: string
-  nat_op?: string
-  tipo_op?: string
-  dest?: string
-  form_cafe?: string
-  ent_cafe?: string
-  env_fe?: string
-  sale_tran_type?: string
-  version?: string
   // Emisor data
   emis_name?: string
   emis_branch?: string
@@ -29,32 +21,20 @@ export interface Invoice {
   emis_ruc_tipo?: string
   emis_ruc_num?: string
   emis_ruc_dv?: string
-  emis_ubi_code?: string
-  emis_correg?: string
-  emis_district?: string
-  emis_province?: string
-  emis_phone?: string
   // Receptor data
   rec_type?: string
   rec_name?: string
   rec_address?: string
   rec_country?: string
-  rec_ubi_code?: string
-  rec_correg?: string
-  rec_district?: string
-  rec_province?: string
   rec_phone?: string
   rec_email?: string
   // Totals
   total_net: number
   total_itbms: number
-  total_isc: number
   total_gravado: number
   total_discount: number
   total_amount: number
   total_received: number
-  num_payments?: number
-  num_items?: number
   items_total: number
   status: string
   created_by?: string

@@ -71,4 +71,17 @@ export class UserService {
     
     return !!data
   }
+
+  // Get technicians (users with tech/ops role only)
+  static async getTechnicians() {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, full_name, email, role')
+      .in('role', ['tech', 'ops'])
+      .eq('is_active', true)
+      .order('full_name', { ascending: true })
+    
+    if (error) throw error
+    return data || []
+  }
 }

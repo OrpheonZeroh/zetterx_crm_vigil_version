@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { InvoiceService, type Invoice } from '@/lib/services/invoice-service'
 import { WorkOrderService, type WorkOrder } from '@/lib/services/work-order-service'
 import { CustomerService, type Customer } from '@/lib/services/customer-service'
+import { QuoteService, type Quote } from '@/lib/services/quote-service'
 import { useToast } from '@/components/ui/toast'
 
 interface InvoiceModalProps {
@@ -20,9 +21,11 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
   const [error, setError] = useState('')
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [sentQuotes, setSentQuotes] = useState<Quote[]>([])
   const { showToast } = useToast()
   
   const [formData, setFormData] = useState({
+    quote_id: '',
     work_order_id: invoice?.work_order_id || '',
     customer_id: invoice?.customer_id || '',
     env_code: invoice?.env_code || 1,
@@ -31,9 +34,6 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
     doc_number: invoice?.doc_number || '',
     pos_code: invoice?.pos_code || '001',
     issue_date: invoice?.issue_date ? invoice.issue_date.split('T')[0] : new Date().toISOString().split('T')[0],
-    nat_op: invoice?.nat_op || '1',
-    tipo_op: invoice?.tipo_op || '1',
-    dest: invoice?.dest || '1',
     // Receptor data
     rec_type: invoice?.rec_type || '1',
     rec_name: invoice?.rec_name || '',
@@ -53,6 +53,7 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
     if (isOpen) {
       loadWorkOrders()
       loadCustomers()
+      loadSentQuotes()
       if (!invoice) {
         generateDocNumber()
       }
@@ -62,6 +63,7 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
   useEffect(() => {
     if (invoice) {
       setFormData({
+        quote_id: '',
         work_order_id: invoice.work_order_id || '',
         customer_id: invoice.customer_id || '',
         env_code: invoice.env_code || 1,
@@ -70,9 +72,6 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
         doc_number: invoice.doc_number || '',
         pos_code: invoice.pos_code || '001',
         issue_date: invoice.issue_date ? invoice.issue_date.split('T')[0] : new Date().toISOString().split('T')[0],
-        nat_op: invoice.nat_op || '1',
-        tipo_op: invoice.tipo_op || '1',
-        dest: invoice.dest || '1',
         rec_type: invoice.rec_type || '1',
         rec_name: invoice.rec_name || '',
         rec_address: invoice.rec_address || '',
@@ -87,6 +86,7 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
       })
     } else {
       setFormData({
+        quote_id: '',
         work_order_id: '',
         customer_id: '',
         env_code: 1,
@@ -95,9 +95,6 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
         doc_number: '',
         pos_code: '001',
         issue_date: new Date().toISOString().split('T')[0],
-        nat_op: '1',
-        tipo_op: '1',
-        dest: '1',
         rec_type: '1',
         rec_name: '',
         rec_address: '',
@@ -116,10 +113,27 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
 
   const loadWorkOrders = async () => {
     try {
-      const { workOrders } = await WorkOrderService.getWorkOrders({ limit: 1000 })
+      // Load only completed work orders
+      const { workOrders } = await WorkOrderService.getWorkOrders({ 
+        limit: 1000,
+        status: 'completed'
+      })
       setWorkOrders(workOrders)
     } catch (error) {
       console.error('Error loading work orders:', error)
+    }
+  }
+
+  const loadSentQuotes = async () => {
+    try {
+      // Load only sent quotes (not draft)
+      const { quotes } = await QuoteService.getQuotes({ 
+        limit: 1000,
+        status: 'sent'
+      })
+      setSentQuotes(quotes)
+    } catch (error) {
+      console.error('Error loading sent quotes:', error)
     }
   }
 
@@ -160,6 +174,80 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
     }))
   }
 
+  const handleQuoteChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const quoteId = e.target.value
+    if (!quoteId) return
+
+    try {
+      const quote = await QuoteService.getQuote(quoteId)
+      if (quote && quote.customers) {
+        setFormData(prev => ({
+          ...prev,
+          quote_id: quoteId,
+          customer_id: quote.customer_id || '',
+          rec_name: quote.customers?.name || '',
+          rec_email: quote.customers?.email || '',
+          rec_phone: '',
+          rec_address: '',
+          total_net: quote.subtotal || 0,
+          total_itbms: quote.itbms_total || 0,
+          total_amount: quote.total || 0,
+          items_total: quote.total || 0
+        }))
+        
+        showToast({
+          type: 'success',
+          title: 'Cotización cargada',
+          message: `Datos de la cotización #${quote.id?.slice(-8)} han sido cargados`
+        })
+      }
+    } catch (error: any) {
+      console.error('Error loading quote:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar los datos de la cotización'
+      })
+    }
+  }
+
+  const handleWorkOrderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const workOrderId = e.target.value
+    if (!workOrderId) return
+
+    try {
+      const workOrder = await WorkOrderService.getWorkOrder(workOrderId)
+      if (workOrder && workOrder.customer) {
+        setFormData(prev => ({
+          ...prev,
+          work_order_id: workOrderId,
+          customer_id: workOrder.customer_id || '',
+          rec_name: workOrder.customer?.name || '',
+          rec_email: workOrder.customer?.email || '',
+          rec_phone: workOrder.customer?.phone || '',
+          rec_address: '',
+          total_net: workOrder.estimated_value || 0,
+          total_itbms: (workOrder.estimated_value || 0) * 0.07,
+          total_amount: (workOrder.estimated_value || 0) * 1.07,
+          items_total: (workOrder.estimated_value || 0) * 1.07
+        }))
+        
+        showToast({
+          type: 'success',
+          title: 'Orden de trabajo cargada',
+          message: `Datos de la orden "${workOrder.title}" han sido cargados`
+        })
+      }
+    } catch (error: any) {
+      console.error('Error loading work order:', error)
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar los datos de la orden de trabajo'
+      })
+    }
+  }
+
   const calculateTotals = () => {
     const net = parseFloat(formData.total_net.toString()) || 0
     const itbms = net * 0.07 // 7% ITBMS rate
@@ -172,10 +260,7 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
       items_total: total,
       total_gravado: net,
       total_discount: 0,
-      total_isc: 0,
-      total_received: total,
-      num_payments: 1,
-      num_items: 1
+      total_received: total
     }))
   }
 
@@ -195,6 +280,9 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
 
       const invoiceData = {
         ...formData,
+        // Convert empty strings to null for UUID fields
+        work_order_id: formData.work_order_id || null,
+        customer_id: formData.customer_id || null,
         issue_date: new Date(formData.issue_date).toISOString(),
         total_net: parseFloat(formData.total_net.toString()) || 0,
         total_itbms: parseFloat(formData.total_itbms.toString()) || 0,
@@ -202,11 +290,11 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
         items_total: parseFloat(formData.items_total.toString()) || 0,
         total_gravado: parseFloat(formData.total_net.toString()) || 0,
         total_discount: 0,
-        total_isc: 0,
-        total_received: parseFloat(formData.total_amount.toString()) || 0,
-        num_payments: 1,
-        num_items: 1
+        total_received: parseFloat(formData.total_amount.toString()) || 0
       }
+
+      // Remove quote_id from invoice data since it's not a database column
+      delete (invoiceData as any).quote_id
 
       if (invoice?.id) {
         await InvoiceService.updateInvoice(invoice.id, invoiceData)
@@ -274,29 +362,49 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
             <div className="space-y-4">
               <h4 className="text-lg font-medium text-gray-900 border-b pb-2">Información Básica</h4>
               
+              {/* Quote Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cotización Enviada (Auto-llenar datos)
+                </label>
+                <select
+                  name="quote_id"
+                  value={formData.quote_id}
+                  onChange={handleQuoteChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Selecciona una cotización enviada</option>
+                  {sentQuotes.map(quote => (
+                    <option key={quote.id} value={quote.id}>
+                      Cotización #{quote.id?.slice(-8)} - {quote.customers?.name || 'Sin cliente'} - ${quote.total?.toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Work Order and Customer */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Orden de Trabajo
+                    Orden de Trabajo Completada
                   </label>
                   <select
                     name="work_order_id"
                     value={formData.work_order_id}
-                    onChange={handleChange}
+                    onChange={handleWorkOrderChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="">Selecciona orden</option>
+                    <option value="">Selecciona orden completada</option>
                     {workOrders.map(order => (
                       <option key={order.id} value={order.id}>
-                        {order.title}
+                        {order.title} - ${order.estimated_value?.toFixed(2) || '0.00'}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cliente
+                    Cliente Manual
                   </label>
                   <select
                     name="customer_id"
@@ -304,7 +412,7 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
                     onChange={handleCustomerChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="">Selecciona cliente</option>
+                    <option value="">Selecciona cliente manualmente</option>
                     {customers.map(customer => (
                       <option key={customer.id} value={customer.id}>
                         {customer.name}
@@ -312,6 +420,13 @@ export function InvoiceModal({ isOpen, onClose, invoice, onSave }: InvoiceModalP
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Info Note */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-700">
+                  <strong>💡 Tip:</strong> Selecciona una cotización enviada o una orden de trabajo completada para auto-llenar automáticamente todos los datos del cliente y montos.
+                </p>
               </div>
 
               {/* Document Info */}

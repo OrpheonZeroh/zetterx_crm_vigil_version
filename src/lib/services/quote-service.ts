@@ -1,10 +1,9 @@
-'use client'
-
 import { supabase } from '@/lib/supabase'
 
 export interface Quote {
   id?: string
-  work_order_id: string
+  customer_id: string
+  work_order_id?: string
   version: number
   status: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
   subtotal: number
@@ -13,9 +12,16 @@ export interface Quote {
   total: number
   notes?: string
   created_at?: string
-  work_order?: {
+  customers?: {
+    name: string
+    email?: string
+  }
+  work_orders?: {
     title: string
     customer_id: string
+    customers?: {
+      name: string
+    }
   }
   items?: QuoteItem[]
 }
@@ -34,9 +40,9 @@ export interface QuoteItem {
 }
 
 export interface QuoteFilters {
+  customer_id?: string
   work_order_id?: string
   status?: Quote['status']
-  customer_id?: string
   date_from?: string
   date_to?: string
   search?: string
@@ -47,16 +53,66 @@ export interface QuoteFilters {
 export class QuoteService {
   // Create new quote
   static async createQuote(quote: Omit<Quote, 'id' | 'created_at'>): Promise<Quote> {
+    // First create a work order for this quote if customer_id is provided
+    let workOrderId = quote.work_order_id
+    
+    if (!workOrderId && quote.customer_id) {
+      const { data: workOrderData, error: woError } = await supabase
+        .from('work_orders')
+        .insert({
+          customer_id: quote.customer_id,
+          title: `Cotización #${Date.now()}`,
+          status: 'lead',
+          estimated_value: quote.total || 0
+        })
+        .select('id')
+        .single()
+      
+      if (woError) throw new Error(`Error creating work order: ${woError.message}`)
+      workOrderId = workOrderData.id
+    }
+    
+    // Now create the quote with work_order_id
+    const quoteData = {
+      work_order_id: workOrderId,
+      version: quote.version,
+      status: quote.status,
+      subtotal: quote.subtotal,
+      itbms_total: quote.itbms_total,
+      discount_total: quote.discount_total,
+      total: quote.total,
+      notes: quote.notes
+    }
+    
     const { data, error } = await supabase
       .from('quotes')
-      .insert([quote])
-      .select(`
-        *,
-        work_orders:work_order_id(title, customer_id)
-      `)
+      .insert([quoteData])
+      .select('*')
       .single()
 
     if (error) throw new Error(`Error creating quote: ${error.message}`)
+    
+    // Manually join customer data from work_order
+    if (data.work_order_id) {
+      const { data: workOrderData } = await supabase
+        .from('work_orders')
+        .select(`
+          customer_id,
+          customers!inner (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('id', data.work_order_id)
+        .single()
+      
+      if (workOrderData?.customers) {
+        data.customers = workOrderData.customers
+        data.customer_id = workOrderData.customer_id
+      }
+    }
+    
     return data
   }
 
@@ -66,7 +122,15 @@ export class QuoteService {
       .from('quotes')
       .select(`
         *,
-        work_orders:work_order_id(title, customer_id)
+        work_orders!inner (
+          id,
+          customer_id,
+          customers!inner (
+            id,
+            name,
+            email
+          )
+        )
       `)
       .eq('id', id)
       .single()
@@ -75,7 +139,18 @@ export class QuoteService {
       if (error.code === 'PGRST116') return null
       throw new Error(`Error fetching quote: ${error.message}`)
     }
-    return data
+
+    // Transform data to include customer info at quote level
+    const quote = {
+      ...data,
+      customer_id: data.work_orders?.customer_id,
+      customers: data.work_orders?.customers ? {
+        name: data.work_orders.customers.name,
+        email: data.work_orders.customers.email
+      } : null
+    }
+
+    return quote
   }
 
   // Get quotes with filtering
@@ -87,11 +162,22 @@ export class QuoteService {
       .from('quotes')
       .select(`
         *,
-        work_orders:work_order_id(title, customer_id)
+        work_orders!inner (
+          id,
+          customer_id,
+          customers!inner (
+            id,
+            name,
+            email
+          )
+        )
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
 
     // Apply filters
+    if (filters.customer_id) {
+      query = query.eq('work_orders.customer_id', filters.customer_id)
+    }
     if (filters.work_order_id) {
       query = query.eq('work_order_id', filters.work_order_id)
     }
@@ -105,7 +191,7 @@ export class QuoteService {
       query = query.lte('created_at', filters.date_to)
     }
     if (filters.search) {
-      query = query.or(`notes.ilike.%${filters.search}%`)
+      query = query.or(`notes.ilike.%${filters.search}%,work_orders.customers.name.ilike.%${filters.search}%`)
     }
 
     // Apply pagination
@@ -120,8 +206,18 @@ export class QuoteService {
 
     if (error) throw new Error(`Error fetching quotes: ${error.message}`)
 
+    // Transform data to include customer info at quote level
+    const quotes = (data || []).map(quote => ({
+      ...quote,
+      customer_id: quote.work_orders?.customer_id,
+      customers: quote.work_orders?.customers ? {
+        name: quote.work_orders.customers.name,
+        email: quote.work_orders.customers.email
+      } : null
+    }))
+
     return {
-      quotes: data || [],
+      quotes,
       total: count || 0
     }
   }
@@ -132,13 +228,24 @@ export class QuoteService {
       .from('quotes')
       .update(updates)
       .eq('id', id)
-      .select(`
-        *,
-        work_orders:work_order_id(title, customer_id)
-      `)
+      .select('*')
       .single()
 
     if (error) throw new Error(`Error updating quote: ${error.message}`)
+    
+    // Manually join customer data if needed
+    if (data.customer_id) {
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select('name, email')
+        .eq('id', data.customer_id)
+        .single()
+      
+      if (customerData) {
+        data.customers = customerData
+      }
+    }
+    
     return data
   }
 
@@ -184,40 +291,59 @@ export class QuoteService {
     return data
   }
 
-  // Delete quote item
-  static async deleteQuoteItem(id: string): Promise<void> {
-    const { error } = await supabase
+  // Delete quote
+  static async deleteQuote(id: string): Promise<void> {
+    // First delete quote items
+    const { error: itemsError } = await supabase
       .from('quote_items')
+      .delete()
+      .eq('quote_id', id)
+
+    if (itemsError) throw new Error(`Error deleting quote items: ${itemsError.message}`)
+
+    // Then delete the quote
+    const { error } = await supabase
+      .from('quotes')
       .delete()
       .eq('id', id)
 
-    if (error) throw new Error(`Error deleting quote item: ${error.message}`)
+    if (error) throw new Error(`Error deleting quote: ${error.message}`)
   }
 
-  // Get quotes by work order
-  static async getQuotesByWorkOrder(workOrderId: string): Promise<Quote[]> {
+  // Get quotes by customer
+  static async getQuotesByCustomer(customerId: string): Promise<Quote[]> {
     const { data, error } = await supabase
       .from('quotes')
-      .select(`
-        *,
-        work_orders:work_order_id(title, customer_id)
-      `)
-      .eq('work_order_id', workOrderId)
+      .select('*')
+      .eq('customer_id', customerId)
       .order('version', { ascending: false })
 
-    if (error) throw new Error(`Error fetching work order quotes: ${error.message}`)
+    if (error) throw new Error(`Error fetching customer quotes: ${error.message}`)
+    
+    // Manually join customer data for each quote
+    if (data && data.length > 0) {
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select('name, email')
+        .eq('id', customerId)
+        .single()
+      
+      if (customerData) {
+        data.forEach(quote => {
+          quote.customers = customerData
+        })
+      }
+    }
+    
     return data || []
   }
 
-  // Get latest quote version for work order
-  static async getLatestQuoteVersion(workOrderId: string): Promise<Quote | null> {
+  // Get latest quote version for customer
+  static async getLatestQuoteVersionForCustomer(customerId: string): Promise<Quote | null> {
     const { data, error } = await supabase
       .from('quotes')
-      .select(`
-        *,
-        work_orders:work_order_id(title, customer_id)
-      `)
-      .eq('work_order_id', workOrderId)
+      .select('*')
+      .eq('customer_id', customerId)
       .order('version', { ascending: false })
       .limit(1)
       .single()
@@ -226,70 +352,60 @@ export class QuoteService {
       if (error.code === 'PGRST116') return null
       throw new Error(`Error fetching latest quote: ${error.message}`)
     }
+    
+    // Manually join customer data if needed
+    if (data && data.customer_id) {
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select('name, email')
+        .eq('id', data.customer_id)
+        .single()
+      
+      if (customerData) {
+        data.customers = customerData
+      }
+    }
+    
     return data
   }
 
-  // Create new quote version
-  static async createNewVersion(workOrderId: string, baseQuoteId?: string): Promise<Quote> {
-    // Get the current highest version
-    const { data: maxVersionData } = await supabase
-      .from('quotes')
-      .select('version')
-      .eq('work_order_id', workOrderId)
-      .order('version', { ascending: false })
-      .limit(1)
-      .single()
+  // Create new quote version based on existing quote
+  static async createQuoteVersion(originalQuoteId: string, changes: Partial<Quote> = {}): Promise<Quote> {
+    const originalQuote = await this.getQuote(originalQuoteId)
+    if (!originalQuote) {
+      throw new Error('Original quote not found')
+    }
 
-    const newVersion = (maxVersionData?.version || 0) + 1
-
-    let newQuote: Omit<Quote, 'id' | 'created_at'>
-
-    if (baseQuoteId) {
-      // Copy from existing quote
-      const baseQuote = await this.getQuote(baseQuoteId)
-      if (!baseQuote) throw new Error('Base quote not found')
-
-      newQuote = {
-        work_order_id: workOrderId,
-        version: newVersion,
-        status: 'draft',
-        subtotal: baseQuote.subtotal,
-        itbms_total: baseQuote.itbms_total,
-        discount_total: baseQuote.discount_total,
-        total: baseQuote.total,
-        notes: baseQuote.notes
-      }
-    } else {
-      // Create blank quote
-      newQuote = {
-        work_order_id: workOrderId,
-        version: newVersion,
-        status: 'draft',
-        subtotal: 0,
-        itbms_total: 0,
-        discount_total: 0,
-        total: 0
-      }
+    const newVersion = originalQuote.version + 1
+    const newQuote: Omit<Quote, 'id' | 'created_at'> = {
+      customer_id: originalQuote.customer_id,
+      work_order_id: originalQuote.work_order_id,
+      version: newVersion,
+      status: 'draft',
+      subtotal: originalQuote.subtotal,
+      itbms_total: originalQuote.itbms_total,
+      discount_total: originalQuote.discount_total,
+      total: originalQuote.total,
+      notes: originalQuote.notes,
+      ...changes
     }
 
     const createdQuote = await this.createQuote(newQuote)
 
-    // Copy items if based on existing quote
-    if (baseQuoteId) {
-      const baseItems = await this.getQuoteItems(baseQuoteId)
-      for (const item of baseItems) {
-        await this.addQuoteItem({
-          quote_id: createdQuote.id!,
-          line_seq: item.line_seq,
-          product_code: item.product_code,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          itbms_rate: item.itbms_rate,
-          discount: item.discount,
-          line_total: item.line_total
-        })
-      }
+    // Copy items from original quote
+    const originalItems = await this.getQuoteItems(originalQuoteId)
+    for (const item of originalItems) {
+      await this.addQuoteItem({
+        quote_id: createdQuote.id!,
+        line_seq: item.line_seq,
+        product_code: item.product_code,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        itbms_rate: item.itbms_rate,
+        discount: item.discount,
+        line_total: item.line_total
+      })
     }
 
     return createdQuote
@@ -327,53 +443,54 @@ export class QuoteService {
   // Get quote statistics
   static async getQuoteStats(): Promise<{
     total: number
-    byStatus: { [key: string]: number }
+    byStatus: Record<Quote['status'], number>
     totalValue: number
     conversionRate: number
     thisMonth: number
   }> {
-    // Get total quotes
-    const { count: total } = await supabase
+    // Get all quotes data
+    const { data, error } = await supabase
       .from('quotes')
-      .select('*', { count: 'exact', head: true })
+      .select('status, total, created_at')
 
-    // Get quotes by status
-    const { data: statusData } = await supabase
-      .from('quotes')
-      .select('status')
+    if (error) throw new Error(`Error fetching quote stats: ${error.message}`)
 
-    const byStatus: { [key: string]: number } = {}
-    statusData?.forEach(quote => {
-      byStatus[quote.status] = (byStatus[quote.status] || 0) + 1
-    })
+    const total = data.length
+    const byStatus: Record<Quote['status'], number> = {
+      draft: 0,
+      sent: 0,
+      approved: 0,
+      rejected: 0,
+      expired: 0
+    }
 
-    // Get total value
-    const { data: valueData } = await supabase
-      .from('quotes')
-      .select('total')
-
-    const totalValue = valueData?.reduce((sum, quote) => sum + quote.total, 0) || 0
-
-    // Calculate conversion rate (approved / sent)
-    const sent = byStatus['sent'] || 0
-    const approved = byStatus['approved'] || 0
-    const conversionRate = sent > 0 ? Math.round((approved / sent) * 100) : 0
-
-    // Get quotes created this month
+    let totalValue = 0
+    let thisMonth = 0
     const currentMonth = new Date()
     const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
-    
-    const { count: thisMonth } = await supabase
-      .from('quotes')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', firstDayOfMonth.toISOString())
+
+    data.forEach(quote => {
+      byStatus[quote.status as Quote['status']]++
+      totalValue += quote.total || 0
+      
+      const createdAt = new Date(quote.created_at)
+      if (createdAt >= firstDayOfMonth) {
+        thisMonth++
+      }
+    })
+
+    // Calculate conversion rate (approved / sent)
+    const sent = byStatus.sent
+    const approved = byStatus.approved
+    const conversionRate = sent > 0 ? Math.round((approved / sent) * 100) : 0
 
     return {
-      total: total || 0,
+      total,
       byStatus,
       totalValue,
       conversionRate,
-      thisMonth: thisMonth || 0
+      thisMonth
     }
   }
+
 }

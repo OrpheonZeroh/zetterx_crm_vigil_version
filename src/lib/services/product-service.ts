@@ -7,7 +7,7 @@ export interface Product {
   unit_price: number
   itbms_rate: number
   is_service: boolean
-  status?: boolean  // true = active, false = inactive
+  is_active?: boolean  // true = active, false = inactive
   created_at?: string
   updated_at?: string
 }
@@ -15,7 +15,7 @@ export interface Product {
 export interface ProductFilters {
   search?: string
   isService?: boolean
-  status?: boolean
+  isActive?: boolean
   priceMin?: number
   priceMax?: number
   dateFrom?: string
@@ -55,8 +55,8 @@ export class ProductService {
     }
 
     // Apply status filter
-    if (filters.status !== undefined) {
-      query = query.eq('status', filters.status)
+    if (filters.isActive !== undefined) {
+      query = query.eq('is_active', filters.isActive)
     }
 
     // Apply price range filters
@@ -94,14 +94,14 @@ export class ProductService {
   static async getProductStats(): Promise<ProductStats> {
     const { data, error } = await supabase
       .from('products')
-      .select('id, is_service, unit_price')
+      .select('id, is_service, price')
 
     if (error) throw new Error(`Error fetching product stats: ${error.message}`)
 
     const products = data || []
     const total = products.length
     const services = products.filter(p => p.is_service).length
-    const totalValue = products.reduce((sum, p) => sum + (p.unit_price || 0), 0)
+    const totalValue = products.reduce((sum, p) => sum + (p.price || 0), 0)
 
     return {
       total,
@@ -179,7 +179,7 @@ export class ProductService {
       .from('products')
       .select('*')
       .or(`code.ilike.%${query}%,description.ilike.%${query}%`)
-      .eq('status', 'active')
+      .eq('is_active', true)
       .order('code')
       .limit(limit)
 
@@ -193,7 +193,7 @@ export class ProductService {
       .from('products')
       .select('*')
       .eq('is_service', isService)
-      .eq('status', 'active')
+      .eq('is_active', true)
       .order('code')
       .limit(limit)
 
@@ -217,11 +217,11 @@ export class ProductService {
   }
 
   // Bulk update product statuses
-  static async bulkUpdateStatus(productIds: string[], status: 'active' | 'inactive'): Promise<void> {
+  static async bulkUpdateStatus(productIds: string[], isActive: boolean): Promise<void> {
     const { error } = await supabase
       .from('products')
       .update({ 
-        status,
+        is_active: isActive,
         updated_at: new Date().toISOString()
       })
       .in('id', productIds)

@@ -33,6 +33,7 @@ export const Logo: React.FC<LogoProps> = ({
           width={width}
           height={height}
           className="object-contain"
+          style={{ width: 'auto', height: 'auto' }}
           priority
         />
       </div>
@@ -48,6 +49,7 @@ export const Logo: React.FC<LogoProps> = ({
         width={width * 1.5}
         height={height * 1.5}
         className="object-contain"
+        style={{ width: 'auto', height: 'auto' }}
         priority
       />
     </div>

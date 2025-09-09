@@ -5,6 +5,7 @@ import { X, Calendar, Clock, User, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CalendarService, type InstallationSlot } from '@/lib/services/calendar-service'
 import { WorkOrderService, type WorkOrder } from '@/lib/services/work-order-service'
+import { UserService } from '@/lib/services/user-service'
 import { useToast } from '@/components/ui/toast'
 
 interface SlotModalProps {
@@ -15,10 +16,18 @@ interface SlotModalProps {
   selectedDate?: string
 }
 
+interface Technician {
+  id: string
+  full_name: string
+  email: string
+  role: string
+}
+
 export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
+  const [technicians, setTechnicians] = useState<Technician[]>([])
   const { showToast } = useToast()
   
   const [formData, setFormData] = useState({
@@ -34,6 +43,7 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
   useEffect(() => {
     if (isOpen) {
       loadWorkOrders()
+      loadTechnicians()
     }
   }, [isOpen])
 
@@ -72,6 +82,15 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
       setWorkOrders(availableOrders)
     } catch (error) {
       console.error('Error loading work orders:', error)
+    }
+  }
+
+  const loadTechnicians = async () => {
+    try {
+      const technicianData = await UserService.getTechnicians()
+      setTechnicians(technicianData)
+    } catch (error) {
+      console.error('Error loading technicians:', error)
     }
   }
 
@@ -324,19 +343,25 @@ export function SlotModal({ isOpen, onClose, slot, onSave, selectedDate }: SlotM
                 </div>
               </div>
 
-              {/* Team Assignment */}
+              {/* Technician Assignment */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Equipo Asignado
+                  <User className="w-4 h-4 inline-block mr-1" />
+                  Técnico Asignado
                 </label>
-                <input
-                  type="text"
+                <select
                   name="team_id"
                   value={formData.team_id}
                   onChange={handleChange}
-                  placeholder="ID del equipo"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+                >
+                  <option value="">Seleccionar técnico</option>
+                  {technicians.map(tech => (
+                    <option key={tech.id} value={tech.id}>
+                      {tech.full_name} ({tech.role})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Notes */}
