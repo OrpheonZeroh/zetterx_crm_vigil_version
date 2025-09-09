@@ -35,24 +35,24 @@ export default function DashboardPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
+      <div className="space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Welcome Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 text-white">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">
                 ¡Bienvenido, {user?.user_metadata?.full_name || 'Usuario'}!
               </h1>
-              <p className="text-blue-100 text-lg">
+              <p className="text-blue-100 text-sm sm:text-base lg:text-lg">
                 {formatDate(currentTime)} - {formatTime(currentTime)}
               </p>
-              <p className="text-blue-200 mt-2">
+              <p className="text-blue-200 mt-2 text-sm sm:text-base">
                 Panel de control de ZetterX CRM
               </p>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-blue-200">Último acceso</div>
-              <div className="text-lg font-semibold">Hoy</div>
+            <div className="text-left sm:text-right">
+              <div className="text-xs sm:text-sm text-blue-200">Último acceso</div>
+              <div className="text-base sm:text-lg font-semibold">Hoy</div>
             </div>
           </div>
         </div>
@@ -61,14 +61,14 @@ export default function DashboardPage() {
         <DashboardStats />
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Sales Goals Chart */}
-          <div>
+          <div className="order-2 lg:order-1">
             <SalesGoalsChart />
           </div>
 
           {/* Recent Activity */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 order-1 lg:order-2">
             <RecentActivity />
           </div>
         </div>

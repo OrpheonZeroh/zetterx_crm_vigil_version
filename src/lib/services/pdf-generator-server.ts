@@ -1,24 +1,32 @@
-import 'server-only';
+import 'server-only'
+import puppeteer from 'puppeteer'
+import { Invoice } from './invoice-service'
 
 export interface DGIInvoiceData {
-  numeroFactura: string;
-  cufe: string;
-  urlCufe: string;
-  emisor: any;
-  cliente: any;
-  items: any[];
-  metodosPayment: any[];
-  fechaEmision: string;
-  subtotal: number;
-  itbms: number;
-  total: number;
+  numeroFactura: string
+  cufe: string
+  urlCufe: string
+  emisor: any
+  cliente: any
+  items: any[]
+  metodosPayment: any[]
+  fechaEmision: string
+  subtotal: number
+  itbms: number
+  total: number
   totales?: {
-    subtotal: number;
-    itbms: number;
-    total: number;
-  };
-  estado?: string;
-  formaPago?: any[];
+    subtotal: number
+    itbms: number
+    total: number
+  }
+  estado?: string
+  formaPago?: any[]
+}
+
+export interface PDFGenerationResult {
+  success: boolean
+  buffer?: Buffer
+  error?: string
 }
 
 /**
@@ -27,40 +35,74 @@ export interface DGIInvoiceData {
  */
 export class PDFGeneratorServerService {
   /**
-   * Genera PDF usando html-pdf-node con importación dinámica
-   * Solo funciona en server-side
+   * 📄 Genera PDF de factura usando Puppeteer (solo servidor)
    */
-  static async generatePDFBuffer(invoiceData: DGIInvoiceData): Promise<Buffer> {
+  static async generateInvoicePDF(invoice: Invoice): Promise<PDFGenerationResult> {
+    let browser
     try {
-      console.log('🔄 Generating PDF from HTML (server-side)...');
-      
-      // Importación dinámica para evitar problemas de webpack
-      const htmlPdf = await import('html-pdf-node');
-      
-      const htmlContent = this.generateInvoiceHTML(invoiceData);
-      
-      const options = {
-        format: 'A4' as const,
-        border: {
+      console.log(`📄 Generando PDF para factura: ${invoice.doc_number}`)
+
+      // Convertir Invoice a DGIInvoiceData format usando campos existentes
+      const invoiceData: DGIInvoiceData = {
+        numeroFactura: invoice.doc_number || '',
+        cufe: invoice.cufe || 'N/A',
+        urlCufe: `https://dgi.mef.gob.pa/verificar/${invoice.cufe || 'N/A'}`,
+        emisor: {
+          ruc: invoice.emis_ruc_num || '',
+          razon_social: invoice.emis_name || '',
+          direccion: invoice.emis_address || ''
+        },
+        cliente: {
+          nombre: invoice.rec_name || invoice.customer?.name || '',
+          ruc: invoice.rec_type || 'N/A',
+          direccion: invoice.rec_address || '',
+          email: invoice.rec_email || invoice.customer?.email || ''
+        },
+        items: [],
+        metodosPayment: [],
+        fechaEmision: invoice.issue_date || new Date().toISOString(),
+        subtotal: invoice.total_net || 0,
+        itbms: invoice.total_itbms || 0,
+        total: invoice.total_amount || 0
+      }
+
+      const htmlContent = this.generateInvoiceHTML(invoiceData)
+
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      })
+
+      const page = await browser.newPage()
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
+
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        margin: {
           top: '0.5in',
           right: '0.5in',
           bottom: '0.5in',
           left: '0.5in'
-        }
-      };
+        },
+        printBackground: true
+      })
 
-      const pdfBuffer = await htmlPdf.default.generatePdf({ content: htmlContent }, options);
-      console.log('✅ PDF generated successfully');
-      
-      // Ensure we return a proper Buffer
-      if (Buffer.isBuffer(pdfBuffer)) {
-        return pdfBuffer;
-      } else {
-        throw new Error('PDF generation did not return a valid Buffer');
+      console.log(`✅ PDF generado exitosamente: ${pdfBuffer.length} bytes`)
+
+      return {
+        success: true,
+        buffer: Buffer.from(pdfBuffer)
       }
     } catch (error) {
-      console.error('❌ Error generating PDF:', error);
-      throw new Error('Failed to generate PDF: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('❌ Error generando PDF:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    } finally {
+      if (browser) {
+        await browser.close()
+      }
     }
   }
 
@@ -68,12 +110,37 @@ export class PDFGeneratorServerService {
    * Genera PDF como base64 string (para compatibilidad)
    */
   static async generatePDFBase64(invoiceData: DGIInvoiceData): Promise<string> {
+    let browser
     try {
-      const pdfBuffer = await this.generatePDFBuffer(invoiceData);
-      return pdfBuffer.toString('base64');
+      const htmlContent = this.generateInvoiceHTML(invoiceData)
+      
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      })
+
+      const page = await browser.newPage()
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
+
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        margin: {
+          top: '0.5in',
+          right: '0.5in',
+          bottom: '0.5in',
+          left: '0.5in'
+        },
+        printBackground: true
+      })
+
+      return Buffer.from(pdfBuffer).toString('base64')
     } catch (error) {
-      console.error('❌ Error generating PDF base64:', error);
-      throw error;
+      console.error('❌ Error generating PDF base64:', error)
+      throw error
+    } finally {
+      if (browser) {
+        await browser.close()
+      }
     }
   }
 

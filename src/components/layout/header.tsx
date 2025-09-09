@@ -2,12 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, Search, User, LogOut, Settings } from 'lucide-react'
+import { Bell, Search, User, LogOut, Settings, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { user, signOut } = useAuth()
   const router = useRouter()
@@ -20,17 +24,32 @@ export function Header() {
   }
 
   return (
-    <header className="header">
+    <header className="bg-white border-b border-gray-200 px-3 sm:px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Left side - Search */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Buscar clientes, órdenes, productos..."
-              className="header-search"
-            />
+        {/* Left side - Mobile menu + Search */}
+        <div className="flex items-center flex-1">
+          {/* Mobile menu button */}
+          {onMenuClick && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMenuClick}
+              className="mr-2 lg:hidden"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+          )}
+          
+          {/* Search */}
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+            </div>
           </div>
         </div>
 

@@ -14,6 +14,7 @@ export interface DGIPayload {
     iAmb: number
     iTpEmis: string
     iDoc: string
+    dId: string
     dNroDF: string
     dPtoFacDF: string
     dFechaEm: string
@@ -127,18 +128,28 @@ export class DGIApiService {
     const now = new Date()
     const formattedDate = now.toISOString().slice(0, 19) + '-05:00'
     
-    // Generate proper DGI document number format: POS-YYYY-NNNNNNNN
-    const year = now.getFullYear()
+    // Generate proper DGI document number format: NNNNNNNN (8 digits)
+    const docNumber = (invoice.doc_number || '1').padStart(8, '0')
     const posCode = (invoice.pos_code || "001").padStart(3, '0')
-    const docNumber = invoice.doc_number.padStart(8, '0')
-    const dgiDocNumber = `${posCode}-${year}-${docNumber}`
+    
+    // Generate DGI document ID (dId) - max 50 chars according to DGI specs
+    const rucDV = invoice.emis_ruc_dv || "86"
+    const rucNum = (invoice.emis_ruc_num || "155646463-2-2017").replace(/-/g, '')
+    const year = now.getFullYear().toString().slice(-2) // Last 2 digits
+    const month = (now.getMonth() + 1).toString().padStart(2, '0')
+    const day = now.getDate().toString().padStart(2, '0')
+    const sequence = docNumber
+    
+    // Format: FE + iTpEmis + iAmb + RUC + DV + POS + YY + MM + DD + Sequence (max 50 chars)
+    const dgiId = `FE01${this.CONFIG.isTestMode ? '2' : '1'}${rucNum}${rucDV}${posCode}${year}${month}${day}${sequence}`
 
     return {
       dGen: {
         iAmb: this.CONFIG.isTestMode ? 2 : 1, // 2=Test, 1=Producción
         iTpEmis: "01",
         iDoc: "01", 
-        dNroDF: dgiDocNumber,
+        dId: dgiId,
+        dNroDF: docNumber,
         dPtoFacDF: posCode,
         dFechaEm: formattedDate,
         dFechaSalida: formattedDate,

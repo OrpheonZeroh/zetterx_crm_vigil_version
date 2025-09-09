@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Edit, Trash2, Eye, FileText, User, DollarSign, X, Mail } from 'lucide-react'
+import { Edit, Trash2, Eye, FileText, User, DollarSign, X, Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { InvoiceService, type Invoice } from '@/lib/services/invoice-service'
 import { DGIApiService } from '@/lib/services/dgi-api-service'
@@ -20,6 +20,7 @@ export function InvoicesTable({ invoices: propInvoices = [], onRefresh }: Invoic
   const [invoices, setInvoices] = useState<Invoice[]>(propInvoices)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [processingInvoices, setProcessingInvoices] = useState<Set<string>>(new Set())
   const [deleteModal, setDeleteModal] = useState<{ 
     isOpen: boolean; 
     invoice: Invoice | null; 
@@ -48,10 +49,13 @@ export function InvoicesTable({ invoices: propInvoices = [], onRefresh }: Invoic
     setEmailModal({ isOpen: true, invoice })
   }
 
-  // Nuevo: Handler para procesar con DGI
+  // Handler para procesar con DGI usando nueva API
   const handleProcessDGI = async (invoice: Invoice) => {
+    if (!invoice.id) return
+    
     try {
-      setLoading(true)
+      // Agregar invoice a estado de procesamiento
+      setProcessingInvoices(prev => new Set(prev).add(invoice.id!))
       console.log(`🚀 Procesando factura ${invoice.doc_number} con DGI...`)
 
       const customerEmail = invoice.rec_email || invoice.customer?.email || ''
@@ -60,25 +64,46 @@ export function InvoicesTable({ invoices: propInvoices = [], onRefresh }: Invoic
         showToast({
           type: 'error',
           title: 'Error',
-          message: 'No se encontró email del cliente'
+          message: 'No se encontró email del cliente para envío'
         })
         return
       }
 
-      const result = await DGIApiService.processInvoiceWithDGI(invoice.id!, customerEmail)
+      // Mostrar toast de inicio de proceso
+      showToast({
+        type: 'warning',
+        title: 'Procesando...',
+        message: `Enviando factura ${invoice.doc_number} a DGI y generando PDF`
+      })
+
+      // Usar nueva API que maneja todo el flujo: DGI → PDF → Storage → Email
+      const response = await fetch(`/api/invoices/process-dgi`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          invoiceId: invoice.id,
+          customerEmail: customerEmail
+        })
+      })
+
+      const result = await response.json()
       
-      if (result.success) {
+      if (response.ok && result.success) {
         showToast({
           type: 'success',
-          title: 'DGI Procesado',
-          message: `Factura procesada y enviada a ${customerEmail}`
+          title: '✅ Procesamiento Completo',
+          message: result.emailSent 
+            ? `Factura procesada con DGI y enviada a ${customerEmail}`
+            : `Factura procesada con DGI (email pendiente)`
         })
-        onRefresh?.() // Refrescar tabla para mostrar datos DGI
+        onRefresh?.() // Refrescar tabla para mostrar datos DGI actualizados
       } else {
         showToast({
           type: 'error',
-          title: 'Error DGI',
-          message: result.message
+          title: '❌ Error en Procesamiento',
+          message: result.error || 'Error al procesar con DGI'
         })
       }
 
@@ -86,11 +111,16 @@ export function InvoicesTable({ invoices: propInvoices = [], onRefresh }: Invoic
       console.error('Error procesando con DGI:', error)
       showToast({
         type: 'error',
-        title: 'Error',
-        message: 'Error al procesar con DGI'
+        title: '❌ Error de Conexión',
+        message: 'Error al comunicarse con el servidor'
       })
     } finally {
-      setLoading(false)
+      // Quitar invoice del estado de procesamiento
+      setProcessingInvoices(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(invoice.id!)
+        return newSet
+      })
     }
   }
 
@@ -296,10 +326,20 @@ export function InvoicesTable({ invoices: propInvoices = [], onRefresh }: Invoic
                     variant="ghost" 
                     size="sm"
                     onClick={() => handleProcessDGI(invoice)}
-                    className="h-8 w-8 p-0 text-gray-400 hover:text-green-600 hover:bg-green-50"
-                    title="Procesar con DGI"
+                    disabled={processingInvoices.has(invoice.id || '')}
+                    className={cn(
+                      "h-8 w-8 p-0",
+                      processingInvoices.has(invoice.id || '') 
+                        ? "text-blue-600 bg-blue-50 cursor-not-allowed" 
+                        : "text-gray-400 hover:text-green-600 hover:bg-green-50"
+                    )}
+                    title={processingInvoices.has(invoice.id || '') ? "Procesando..." : "Procesar con DGI"}
                   >
-                    <FileText className="w-4 h-4" />
+                    {processingInvoices.has(invoice.id || '') ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
                   </Button>
                   <Button 
                     variant="ghost" 

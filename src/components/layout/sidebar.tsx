@@ -19,7 +19,8 @@ import {
   CreditCard,
   ClipboardList,
   Calculator,
-  Bot
+  Bot,
+  X
 } from 'lucide-react'
 
 const navigation = [
@@ -36,14 +37,18 @@ const navigation = [
   { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  onCloseMobile?: () => void
+}
+
+export function Sidebar({ onCloseMobile }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
 
   return (
     <div className={cn(
-      "sidebar",
-      collapsed ? "sidebar-collapsed" : "sidebar-expanded"
+      "sidebar bg-white border-r border-gray-200 flex flex-col h-full",
+      collapsed ? "w-16" : "w-64"
     )}>
       {/* Header */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
@@ -58,16 +63,28 @@ export function Sidebar() {
             />
           </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-          ) : (
-            <ChevronLeft className="w-4 h-4 text-gray-600" />
+        <div className="flex items-center space-x-1">
+          {/* Mobile close button */}
+          {onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              className="p-1 rounded-md hover:bg-gray-100 transition-colors lg:hidden"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
           )}
-        </button>
+          {/* Desktop collapse button */}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1 rounded-md hover:bg-gray-100 transition-colors hidden lg:block"
+          >
+            {collapsed ? (
+              <ChevronRight className="w-4 h-4 text-gray-600" />
+            ) : (
+              <ChevronLeft className="w-4 h-4 text-gray-600" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -78,16 +95,19 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={onCloseMobile} // Close mobile menu on navigation
               className={cn(
-                "nav-item",
-                isActive ? "nav-item-active" : "nav-item-inactive"
+                "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                isActive 
+                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-500" 
+                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
               )}
             >
               <item.icon className={cn(
                 "flex-shrink-0",
                 collapsed ? "w-5 h-5" : "w-5 h-5 mr-3"
               )} />
-              {!collapsed && <span>{item.name}</span>}
+              {!collapsed && <span className="truncate">{item.name}</span>}
             </Link>
           )
         })}
