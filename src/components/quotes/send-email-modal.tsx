@@ -177,9 +177,9 @@ export function SendEmailModal({ isOpen, onClose, quote, onEmailSent }: SendEmai
 
           {/* Preview Info */}
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-            <h4 className="font-medium text-gray-900 mb-2">Vista Previa del Email</h4>
-            <p><strong>Asunto:</strong> Cotización #{quote.id?.slice(-8)} - ZetterX Glass & Aluminum</p>
-            <p><strong>De:</strong> cotizaciones@zetterx.com</p>
+            <h4 className="font-medium text-gray-900 mb-2">Vista Previa del Correo</h4>
+            <p><strong>Asunto:</strong> Cotización #{quote.id?.slice(-8)} - Ventanas Vigil La Chorrera</p>
+            <p><strong>De:</strong>ventanasvigil507@gmail.com</p>
             <p><strong>Para:</strong> {formData.recipientEmail || 'email@ejemplo.com'}</p>
             <p className="mt-2">El email incluirá los detalles completos de la cotización con formato profesional.</p>
           </div>
