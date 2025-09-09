@@ -51,7 +51,7 @@ export default function LoginPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <Logo variant="header" size="md" />
-            <nav className="hidden md:flex items-center space-x-6 lg:space-x-8">
+            <nav className="hidden lg:flex items-center space-x-6 lg:space-x-8">
               <a href="#" className="text-slate-600 hover:text-blue-600 transition-colors font-medium text-sm lg:text-base">Lenssie</a>
               <a href="#" className="text-slate-600 hover:text-blue-600 transition-colors font-medium text-sm lg:text-base">Precios</a>
               <a href="#" className="text-slate-600 hover:text-blue-600 transition-colors font-medium text-sm lg:text-base">FAQ</a>
@@ -65,8 +65,8 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 pt-20 sm:pt-24 pb-32">
         <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           
-          {/* Left Side - Content */}
-          <div className="space-y-6 lg:space-y-8 order-2 lg:order-1">
+          {/* Left Side - Content (Hidden on mobile) */}
+          <div className="hidden lg:block space-y-6 lg:space-y-8 order-2 lg:order-1">
             <div className="space-y-4 lg:space-y-6">
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-center lg:text-left mb-4">
                 <span className="text-slate-900">Automatiza </span>
@@ -173,7 +173,7 @@ export default function LoginPage() {
       <div className="absolute bottom-0 left-0 right-0 py-4 sm:py-8 bg-gradient-to-t from-white/10 to-transparent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center">
-            <p className="text-xs sm:text-sm text-slate-500 uppercase tracking-wider font-medium mb-3 sm:mb-4">
+            <p className="hidden lg:block text-xs sm:text-sm text-slate-500 uppercase tracking-wider font-medium mb-3 sm:mb-4">
               EMPRESAS EN PANAMÁ Y LATAM CONFÍAN EN ZETTERX
             </p>
             <div className="flex justify-center items-center space-x-4 sm:space-x-8">
